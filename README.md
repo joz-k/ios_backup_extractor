@@ -38,7 +38,7 @@ Examples:
       ios_backup_extractor.exe ABC123ABC123 -o "My Photos and Videos"
 
 Version:
-    1.2 (2023-11-06)
+    1.2.0 (2023-11-06)
 ```
 
 Author
