@@ -7,6 +7,8 @@ application on Windows OS or the built-in Finder application on MacOS[^1].
 
 [^1]: Follow instructions from Apple's [iPhone User Guide](https://support.apple.com/guide/iphone/back-up-iphone-iph3ecf67d29/ios).
 
+![screenshot1](doc/res/win_screenshot1.png "Windows screenhost")
+
 `--help` screen
 ---------------
 ```
