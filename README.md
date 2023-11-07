@@ -1,6 +1,14 @@
 iOS Backup Extractor
 ====================
 
+`ios_backup_extractor` is a command line utility to extract media files (phothos and videos)
+from a local iOS device backup. This type of backup is typically created by Apple's iTunes
+application on Windows OS or the built-in Finder application on MacOS[^1].
+
+[^1]: Follow instructions from Apple's [iPhone User Guide](https://support.apple.com/guide/iphone/back-up-iphone-iph3ecf67d29/ios).
+
+`--help` screen
+---------------
 ```
 ‘ios_backup_extractor.exe’ extracts media files from an unencrypted
 local backup of the iOS device made by iTunes application for Windows
@@ -41,6 +49,11 @@ Version:
     1.2.0 (2023-11-06)
 ```
 
+Download
+---------
+
+* [iOS_Backup_Extractor-v1.2.0_x64-windows.exe.zip](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.0/iOS_Backup_Extractor-v1.2.0_x64-windows.exe.zip)
+
 Author
 ------
 
@@ -51,4 +64,3 @@ License
 -------
 
 © 2023 Jozef Kosoru, [Artistic License 2.0](http://www.perlfoundation.org/artistic_license_2_0)
-
