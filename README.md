@@ -9,6 +9,12 @@ application on Windows OS or the built-in Finder application on MacOS[^1].
 
 ![screenshot1](doc/res/win_screenshot1.png "Windows screenhost")
 
+Download
+---------
+
+* Windows x64: [iOS_Backup_Extractor-v1.2.0_x64-windows.exe.zip](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.0/iOS_Backup_Extractor-v1.2.0_x64-windows.exe.zip)
+* MacOS arm64: [iOS_Backup_Extractor-v1.2.0_arm64-macos.zip](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.0/iOS_Backup_Extractor-v1.2.0_arm64-macos.zip)
+
 `--help` screen
 ---------------
 ```
@@ -50,11 +56,6 @@ Examples:
 Version:
     1.2.0 (2023-11-06)
 ```
-
-Download
----------
-
-* [iOS_Backup_Extractor-v1.2.0_x64-windows.exe.zip](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.0/iOS_Backup_Extractor-v1.2.0_x64-windows.exe.zip)
 
 Author
 ------
