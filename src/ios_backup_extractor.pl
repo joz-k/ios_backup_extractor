@@ -352,6 +352,7 @@ sub extractMediaFiles
                             undef,
                             {
                                 sqlite_open_flags => SQLITE_OPEN_READONLY,
+                                PrintError => 0,
                             })
         or die "Error: Cannot open ‘$tmp_manifest_db’ as SQLite db: $DBI::errstr.\n";
 
@@ -640,6 +641,10 @@ sub readInfoPlist ($device_backup_dir)
 
 sub readManifestPlist ($device_backup_dir)
 {
+    # return manifest right away if it was memoized already
+    return (1, %{$g_manifest_plist_map{$device_backup_dir}})
+        if (defined $g_manifest_plist_map{$device_backup_dir});
+
     my $plist = parsePList ("$device_backup_dir/Manifest.plist");
 
     return (0) unless $plist;
@@ -670,9 +675,8 @@ sub readManifestPlist ($device_backup_dir)
 
     $manifest_plist{"Lockdown/$_"} = $lockdown_entries{$_} for keys %lockdown_entries;
 
-    # add this manifest to global map, since it might be useful later to determine
-    # `IsEncrypted` status when trying to run `extractMediaFiles()` function.
-    $g_manifest_plist_map{$device_backup_dir}= \%manifest_plist;
+    # memoize manifest
+    $g_manifest_plist_map{$device_backup_dir} = \%manifest_plist;
 
     return (1, %manifest_plist);
 }
@@ -689,9 +693,6 @@ sub isDeviceBackupEncrypted ($device_backup_dir)
     my ($ok, %manifest_plist) = readManifestPlist ($device_backup_dir);
 
     $ok or die qq{Error: Unable to read "$device_backup_dir/Manifest.plist".\n};
-
-    # store it the global map (not needed currently)
-    $g_manifest_plist_map{$device_backup_dir}= \%manifest_plist;
 
     return    defined $manifest_plist{IsEncrypted}
            && $manifest_plist{IsEncrypted} == 1;
