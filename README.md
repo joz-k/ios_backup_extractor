@@ -14,6 +14,8 @@ Download
 
 * Windows x64: [iOS_Backup_Extractor-v1.2.0_x64-windows.exe.zip](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.0/iOS_Backup_Extractor-v1.2.0_x64-windows.exe.zip)
 * MacOS arm64: [iOS_Backup_Extractor-v1.2.0_arm64-macos.zip](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.0/iOS_Backup_Extractor-v1.2.0_arm64-macos.zip)
+* MacOS intel64: [iOS_Backup_Extractor-v1.2.0_intel64-macos.zip](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.0/iOS_Backup_Extractor-v1.2.0_intel64-macos.zip)
+* Linux x64: [iOS_Backup_Extractor-v1.2.0_x64_linux.tar.gz](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.0/iOS_Backup_Extractor-v1.2.0_x64_linux.tar.gz)
 
 `--help` screen
 ---------------
