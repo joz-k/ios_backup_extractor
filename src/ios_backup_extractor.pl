@@ -39,6 +39,7 @@ my $g_out_dir            = undef;
 my @g_since_date         = (); # (YYYY, MM, DD)
 my %g_deleted_files      = ();
 my %g_manifest_plist_map = ();
+my %g_status_plist_map   = ();
 
 use constant {
     kSerialNumber => 0,
@@ -329,6 +330,9 @@ sub extractMediaFiles
     # abort if the device backup is encrypted
     die "Error: Device backup is ecnrypted. Encrypted backups are not supported.\n"
         if (isDeviceBackupEncrypted ($g_backup_dir));
+
+    # check the backup version
+    checkBackupVersion ($g_backup_dir);
 
     # create a temporary directory for `Manifest.db`
     my $tmp_fh = File::Temp->newdir ('iOS-Backup-Extractor-XXXXXXXXXX',
@@ -700,8 +704,24 @@ sub isDeviceBackupEncrypted ($device_backup_dir)
 
 # ----------------------------------------------------------------
 
+sub checkBackupVersion ($device_backup_dir)
+{
+    # read Status.plist to inspect "Version" field
+    my ($ok, %status_plist) = readStatusPlist ($device_backup_dir);
+
+    # read the version field
+    my ($verMajor, $verMinor) = $status_plist{Version} =~ /^(\d+)\.(\d+)/
+        or die qq{Error: Unable to determine backup version from Status.plist\n};
+}
+
+# ----------------------------------------------------------------
+
 sub readStatusPlist ($device_backup_dir)
 {
+    # return status.plist right away if it was memoized already
+    return (1, %{$g_status_plist_map{$device_backup_dir}})
+        if (defined $g_status_plist_map{$device_backup_dir});
+
     my $plist = parsePList ("$device_backup_dir/Status.plist");
 
     return (0) unless $plist;
@@ -715,6 +735,9 @@ sub readStatusPlist ($device_backup_dir)
     ($status_plist{Date}) = map  { $_->value; }
                             grep { isOfPListType ($_, 'date'); }
                             $plist->{Date};
+
+    # memoize manifest
+    $g_status_plist_map{$device_backup_dir} = \%status_plist;
 
     return (1, %status_plist);
 }
