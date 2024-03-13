@@ -3,23 +3,24 @@
 # ══════════════════════════════════════════════════════════════════════════ #
 #                            iOS Backup Extractor                            #
 #           ――――――――――――――――――――――――――――――――――――――――――――――――――――――           #
-#            © 2023 Jozef Kosoru                      See LICENSE            #
+#            © 2024 Jozef Kosoru                      See LICENSE            #
 # ══════════════════════════════════════════════════════════════════════════ #
 
 use v5.38;
 use warnings 'all';
 use utf8;
 
-use Data::Dumper ();
-use Getopt::Long ();
-use Scalar::Util ();
-use Time::Piece  ();
-use File::Temp   ();
-use File::Copy   ();
-use File::Spec   ();
-use Digest::SHA  ();
-use DBI          ();
-use DBD::SQLite  ();
+use Data::Dumper   ();
+use Getopt::Long   ();
+use Scalar::Util   ();
+use Time::Piece    ();
+use File::Temp     ();
+use File::Copy     ();
+use File::Spec     ();
+use File::Basename ();
+use Digest::SHA    ();
+use DBI            ();
+use DBD::SQLite    ();
 use DBD::SQLite::Constants qw[:file_open];
 use Term::ReadKey     ();
 use IO::Interactive   ();
@@ -28,7 +29,7 @@ use Mac::PropertyList::ReadBinary ();
 
 use constant {
     APP_NAME    => 'ios_backup_extractor',
-    APP_VERSION => '1.2.0 (2023-11-06)',
+    APP_VERSION => '1.2.1 (2024-03-13)',
 };
 
 my $wanted_extensions = 'jpg|jpeg|heic|png|mov';
@@ -161,21 +162,26 @@ sub openDeviceBackupDir ($ios_backup_dir)
 sub listBackupDirs ($ios_backup_dir, $backup_dir_dh)
 {
     return sort
-           grep {    -d "$ios_backup_dir/$_"
-                  && -f "$ios_backup_dir/$_/Info.plist"
-                  && -f "$ios_backup_dir/$_/Manifest.plist"
-                  && -f "$ios_backup_dir/$_/Status.plist"
+           grep {    -d $_
+                  && -f "$_/Info.plist"
+                  && -f "$_/Manifest.plist"
+                  && -f "$_/Status.plist"
                 }
+           map  { File::Spec->catfile ($ios_backup_dir, $_); }
            readdir ($backup_dir_dh);
 }
 
 # ----------------------------------------------------------------
 
-sub listBackups
+sub enumerateBackups
 {
-    my $ios_backup_dir = getMobileSyncBackupDir();
-    my $dh = openDeviceBackupDir ($ios_backup_dir);
-    my @device_backup_dirs = listBackupDirs ($ios_backup_dir, $dh);
+    my @device_backup_dirs;
+
+    for my $ios_backup_dir (getMobileSyncBackupDirs())
+    {
+        my $dh = openDeviceBackupDir ($ios_backup_dir);
+        push @device_backup_dirs, listBackupDirs ($ios_backup_dir, $dh);
+    }
 
     scalar @device_backup_dirs > 0
         or die "There are no iOS device backups found on this computer.\n";
@@ -196,7 +202,7 @@ sub listBackups
         my ($ok, %device_info, %manifest_plist, %status_plist);
 
         # read Info.plist
-        ($ok, %device_info) = readInfoPlist ("$ios_backup_dir/$backup_dir");
+        ($ok, %device_info) = readInfoPlist ($backup_dir);
 
         $ok && $device_info{'Serial Number'} or do {
             warn $clear_msg, qq{Warning: Unable to read "$backup_dir/Info.plist".\n};
@@ -204,8 +210,7 @@ sub listBackups
         };
 
         # read Manifest.plist
-        ($ok, %manifest_plist) = readManifestPlist (File::Spec->catfile ($ios_backup_dir,
-                                                                         $backup_dir));
+        ($ok, %manifest_plist) = readManifestPlist ($backup_dir);
 
         $ok or do {
             warn $clear_msg, qq{Warning: Unable to read "$backup_dir/Manifest.plist".\n};
@@ -213,7 +218,7 @@ sub listBackups
         };
 
         # read Status.plist
-        ($ok, %status_plist) = readStatusPlist ("$ios_backup_dir/$backup_dir");
+        ($ok, %status_plist) = readStatusPlist ($backup_dir);
 
         $ok or do {
             warn $clear_msg, qq{Warning: Unable to read "$backup_dir/Status.plist".\n};
@@ -221,18 +226,36 @@ sub listBackups
         };
 
         my $device_serial_number = $device_info{'Serial Number'};
-        $device_backup_map{$device_serial_number}
-                        = { Info     => \%device_info,
-                            Manifest => \%manifest_plist,
-                            Status   => \%status_plist,
-                            Location => File::Spec->catfile ($ios_backup_dir, $backup_dir),
-                          };
+
+        # add this backup to the map if newer is not already there
+        if (   !exists ($device_backup_map{$device_serial_number})
+            || compareBackupDates ($device_backup_map{$device_serial_number}
+                                                        {Info}{'Last Backup Date'},
+                                   $device_info{'Last Backup Date'})
+           )
+        {
+            $device_backup_map{$device_serial_number}
+                            = { Info     => \%device_info,
+                                Manifest => \%manifest_plist,
+                                Status   => \%status_plist,
+                                Location => $backup_dir,
+                              };
+        }
     }
 
     scalar keys %device_backup_map > 0
         or die $clear_msg, "There are no usable iOS device backups found on this computer.\n";
 
     print STDERR $clear_msg; # clear "Reading..." message
+
+    return %device_backup_map;
+}
+
+# ----------------------------------------------------------------
+
+sub listBackups
+{
+    my %device_backup_map = enumerateBackups ();
 
     if ($cmd_options{'list-long'})
     {
@@ -553,42 +576,51 @@ sub resolveDirOrSerialArg ($backup_dir_or_serial)
 
 sub findBackupDirForSerial ($device_serial)
 {
-    my $ios_backup_dir = getMobileSyncBackupDir();
-    my $dh = openDeviceBackupDir ($ios_backup_dir);
-    my @device_backup_dirs = listBackupDirs ($ios_backup_dir, $dh);
+    my %device_backup_map = enumerateBackups ();
 
-    # iterate over all backups and match the serial number
-    for my $backup_dir (@device_backup_dirs)
+    if (exists $device_backup_map{$device_serial})
     {
-        # read Manifest.plist (because it's smaller than Info.plist)
-        my ($ok, %manifest_plist) = readManifestPlist (File::Spec->catfile ($ios_backup_dir,
-                                                                            $backup_dir));
-        $ok or next;
+        my $backup_dir = $device_backup_map{$device_serial}{Location};
 
-        if ($manifest_plist{'Lockdown/SerialNumber'} eq $device_serial)
-        {
-            my $device_backup_dir = $manifest_plist{'Lockdown/UniqueDeviceID'};
+        say STDERR qq{Info: Using iOS Device backup directory: "$backup_dir"}
+            if $cmd_options{verbose};
 
-            return   (   $device_backup_dir
-                      && $device_backup_dir !~ /^\s*$/
-                      && -d "$ios_backup_dir/$device_backup_dir")
-                   ? File::Spec->catfile ($ios_backup_dir, $device_backup_dir)
-                   : undef;
-        }
+        return $backup_dir;
     }
-
-    # no backup found for a given device serial number
-    return undef;
+    else
+    {
+        # no backup found for a given device serial number
+        return undef;
+    }
 }
 
 # ----------------------------------------------------------------
 
-sub getMobileSyncBackupDir
+sub getMobileSyncBackupDirs
 {
-    my $mobile_sync_dir;
+    my @mobile_sync_dirs;
 
     if ($^O =~ /mswin32/i)
     {
+        # push the MobileSync path for newer "Apple Devices" application
+        my $home_dir = $ENV{USERPROFILE};
+        $home_dir ||= do {
+            require Win32;
+            Win32::GetFolderPath (Win32::CSIDL_PROFILE());
+        };
+
+        -d $home_dir or
+            die "Error: Unable to determine %USERPROFILE% directory.\n";
+
+        my $apple_devices_mobile_sync_backup_dir = File::Spec->catfile ($home_dir,
+                                                                        'Apple',
+                                                                        'MobileSync',
+                                                                        'Backup');
+
+        push @mobile_sync_dirs, $apple_devices_mobile_sync_backup_dir
+            if -d $apple_devices_mobile_sync_backup_dir;
+
+        # push the MobileSync path for iTunes application
         my $app_data_dir = $ENV{APPDATA};
         $app_data_dir ||= do {
             require Win32;
@@ -598,14 +630,17 @@ sub getMobileSyncBackupDir
         -d $app_data_dir or
             die "Error: Unable to determine %APPDATA% directory.\n";
 
-        $mobile_sync_dir = File::Spec->catfile ($app_data_dir,
-                                                'Apple Computer',
-                                                'MobileSync',
-                                                'Backup');
+        my $itunes_mobile_sync_backup_dir = File::Spec->catfile ($app_data_dir,
+                                                                 'Apple Computer',
+                                                                 'MobileSync',
+                                                                 'Backup');
+
+        push @mobile_sync_dirs, $itunes_mobile_sync_backup_dir
+            if -d $itunes_mobile_sync_backup_dir;
     }
     elsif ($^O =~ /darwin/i)
     {
-        $mobile_sync_dir = "$ENV{HOME}/Library/Application Support/MobileSync/Backup";
+        push @mobile_sync_dirs, "$ENV{HOME}/Library/Application Support/MobileSync/Backup";
     }
     else
     {
@@ -613,7 +648,7 @@ sub getMobileSyncBackupDir
             . qq{on $^O plafform.\n};
     }
 
-    return $mobile_sync_dir;
+    return @mobile_sync_dirs;
 }
 
 # ----------------------------------------------------------------
@@ -639,6 +674,19 @@ sub readInfoPlist ($device_backup_dir)
 
 
     return (1, %info_list);
+}
+
+# ----------------------------------------------------------------
+
+sub compareBackupDates ($date1, $date2)
+{
+    # compare two backup dates and return true if `$date2` is newer.
+    # "date" is in format '2023-11-03T17:18:33Z'
+
+    my $date1_time_piece = Time::Piece->strptime ($date1, '%FT%TZ');
+    my $date2_time_piece = Time::Piece->strptime ($date2, '%FT%TZ');
+
+    return $date1_time_piece < $date2_time_piece;
 }
 
 # ----------------------------------------------------------------
@@ -1180,7 +1228,9 @@ __END__
 # Notes:
 #
 # Apple iOS backups are located:
-# • On Windows: %APPDATA%\Apple Computer\MobileSync\Backup\<phone Id>
+# • On Windows:
+#       (iTunes)        %APPDATA%\Apple Computer\MobileSync\Backup\<phone Id>
+#       (Apple Devices) %USERPROFILE%\Apple\MobileSync\Backup\<phone Id>
 # • On MacOS:   ~/Library/Application Support/MobileSync/Backup/<phone Id>
 #
 # Special backup files:
