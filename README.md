@@ -12,17 +12,17 @@ or "Apple Devices" application on Windows OS or the built-in Finder application 
 Download
 ---------
 
-* Windows x64: [iOS_Backup_Extractor-v1.2.0_x64-windows.exe.zip](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.0/iOS_Backup_Extractor-v1.2.0_x64-windows.exe.zip)
-* MacOS arm64: [iOS_Backup_Extractor-v1.2.0_arm64-macos.zip](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.0/iOS_Backup_Extractor-v1.2.0_arm64-macos.zip)
-* MacOS intel64: [iOS_Backup_Extractor-v1.2.0_intel64-macos.zip](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.0/iOS_Backup_Extractor-v1.2.0_intel64-macos.zip)
-* Linux x64: [iOS_Backup_Extractor-v1.2.0_x64_linux.tar.gz](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.0/iOS_Backup_Extractor-v1.2.0_x64_linux.tar.gz)
+* Windows x64: [iOS_Backup_Extractor-v1.2.1_x64-windows.exe.zip](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.1/iOS_Backup_Extractor-v1.2.1_x64-windows.exe.zip)
+* MacOS arm64: [iOS_Backup_Extractor-v1.2.1_arm64-macos.zip](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.1/iOS_Backup_Extractor-v1.2.1_arm64-macos.zip)
+* MacOS intel64: [iOS_Backup_Extractor-v1.2.1_intel64-macos.zip](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.1/iOS_Backup_Extractor-v1.2.1_intel64-macos.zip)
+* Linux x64: [iOS_Backup_Extractor-v1.2.1_x64_linux.tar.gz](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.1/iOS_Backup_Extractor-v1.2.1_x64_linux.tar.gz)
 
 `--help` screen
 ---------------
 ```
-‘ios_backup_extractor.exe’ extracts media files from an unencrypted
-local backup of the iOS device made by iTunes application for Windows
-or by iPhone/iPad backup to MacOS computer.
+‘ios_backup_extractor’ extracts media files from an unencrypted
+local backup of the iOS device made by iTunes or “Apple Devices” application
+for Windows or by iPhone/iPad backup to MacOS computer.
 
 Usage:
   ios_backup_extractor.exe [OPTIONS] DEVICE_SERIAL_ID | DEVICE_BACKUP_DIR --out OUTPUT_DIR
@@ -56,7 +56,7 @@ Examples:
       ios_backup_extractor.exe ABC123ABC123 -o "My Photos and Videos"
 
 Version:
-    1.2.0 (2023-11-06)
+    1.2.1 (2024-03-21)
 ```
 
 Author
@@ -68,4 +68,4 @@ Jozef Kosoru, https://github.com/joz-k/
 License
 -------
 
-© 2023 Jozef Kosoru, [Artistic License 2.0](http://www.perlfoundation.org/artistic_license_2_0)
+© 2024 Jozef Kosoru, [Artistic License 2.0](http://www.perlfoundation.org/artistic_license_2_0)
