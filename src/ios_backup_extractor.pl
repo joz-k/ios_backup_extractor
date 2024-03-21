@@ -29,7 +29,7 @@ use Mac::PropertyList::ReadBinary ();
 
 use constant {
     APP_NAME    => 'ios_backup_extractor',
-    APP_VERSION => '1.2.1 (2024-03-13)',
+    APP_VERSION => '1.2.1 (2024-03-21)',
 };
 
 my $wanted_extensions = 'jpg|jpeg|heic|png|mov';
@@ -77,8 +77,8 @@ sub printHelp
 
     print <<~HELP_END;
         ‘$app_name’ extracts media files from an unencrypted
-        local backup of the iOS device made by iTunes application for Windows
-        or by iPhone/iPad backup to MacOS computer.
+        local backup of the iOS device made by iTunes or “Apple Devices” application
+        for Windows or by iPhone/iPad backup to MacOS computer.
 
         Usage:
           $app_name [OPTIONS] DEVICE_SERIAL_ID | DEVICE_BACKUP_DIR --out OUTPUT_DIR
@@ -125,7 +125,7 @@ sub main
     # verify command line arguments (and set defaults)
     my $show_help = checkAndSetArgs();
 
-    # either there is a correct number of arguments of show help
+    # either there is a correct number of arguments or show help
     printHelp() if $show_help;
 
     # run choosen action
@@ -760,6 +760,13 @@ sub checkBackupVersion ($device_backup_dir)
     # read the version field
     my ($verMajor, $verMinor) = $status_plist{Version} =~ /^(\d+)\.(\d+)/
         or die qq{Error: Unable to determine backup version from Status.plist\n};
+
+    if (   int($verMajor) < 3
+        || (int($verMajor) == 3 && int($verMinor) < 3))
+    {
+        die qq{Error: This tool supports iOS backups since version 3.3.\n}
+            . qq{Found version: $verMajor.$verMinor\n};
+    }
 }
 
 # ----------------------------------------------------------------
@@ -1131,7 +1138,7 @@ sub parsePList ($filename)
 {
     my $plist;
 
-    # first try to parse with a universal parser
+    # first try to parse with an universal parser
     my $eval_ok = eval {
         # disable STDERR for plist parsing to not confuse a user with warning
         # messages
