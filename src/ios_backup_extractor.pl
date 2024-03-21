@@ -645,7 +645,7 @@ sub getMobileSyncBackupDirs
     else
     {
         die   qq{Error: Unable to determine "Apple Computer/MobileSync/Backup" directory }
-            . qq{on $^O plafform.\n};
+            . qq{on $^O platform.\n};
     }
 
     return @mobile_sync_dirs;
