@@ -29,7 +29,7 @@ use Mac::PropertyList::ReadBinary ();
 
 use constant {
     APP_NAME    => 'ios_backup_extractor',
-    APP_VERSION => '1.2.1 (2024-03-21)',
+    APP_VERSION => '1.2.2 (2024-03-30)',
 };
 
 my $wanted_extensions = 'jpg|jpeg|heic|png|mov';
@@ -57,6 +57,7 @@ Getopt::Long::GetOptions(
     'list|l',     # list available device backups
     'format|f=s', # output subdirectory format
     'since|s=s',  # since DATE
+    'add-trash',  # extract also files from deleted
     'verbose|v',  # display more info and warnings
     'dry|d',      # “dry run”: doesn't make any real changes to the filesystem
     'out|o=s',    # output directory
@@ -97,6 +98,7 @@ sub printHelp
                                 - ‘flat’ no subdirectories
           -s, --since DATE    Extract and copy only files created since DATE.
                                 DATE must be in format YYYY-MM-DD.
+              --add-trash     Extract also items marked as deleted.
           -d, --dry           Dry run, don't copy any files.
           -v, --verbose       Show more information while running.
           -h, --help          Display help.
@@ -113,6 +115,9 @@ sub printHelp
 
         Version:
             ${ \APP_VERSION }
+
+        Homepage:
+            https://github.com/joz-k/ios_backup_extractor
 
         HELP_END
     exit;
@@ -420,7 +425,12 @@ sub extractMediaFiles
                 next;
             }
 
-            my $filename  = $+{filename} . q{.} . lc $+{extension};
+            # add '_DELETED' flag to files marked as deleted
+            my $deleted_flag = ($cmd_options{'add-trash'} && $g_deleted_files{$relative_path})
+                             ? '_DELETED'
+                             : q{};
+
+            my $filename = $+{filename} . $deleted_flag . q{.} . lc $+{extension};
 
             # find the file in the blob storage
             my $subdir = $file_id =~ s/^(\w\w).+$/$1/r
@@ -456,7 +466,8 @@ sub extractMediaFiles
             # find a suitable filename (or `undef` if duplicate)
             my $unique_filename = findUniqueFilename ($blob_file, $filename, $out_sub_dir);
 
-            if ($g_deleted_files{$relative_path})
+            if (   not($cmd_options{'add-trash'})
+                && $g_deleted_files{$relative_path})
             {
                 printf "%3d. ($subdir/$file_id) %-13s → <IN_TRASH>, Skipping...\n",
                        $file_index, $filename;
@@ -897,7 +908,7 @@ sub olderThanSince ($file_modif_timepiece, $since_date_aref)
 
 sub findUniqueFilename ($blob_file, $filename, $out_sub_dir)
 {
-    # check if the filename is unique. If there is a file with a same name,
+    # check if the filename is unique. If there is a file with the same name,
     # check if it is a duplicate. If not, find a new unique name for this file.
 
     # file doesn't exist, return the same filename
