@@ -445,7 +445,7 @@ sub extractMediaFiles
             my $subdir = $file_id =~ s/^(\w\w).+$/$1/r
                 or die qq{Error: Unexpected fileID: $file_id\n};
             my $blob_file = "$g_backup_dir/$subdir/$file_id";
-            -f $blob_file or die qq{Error: "$blob_file doesn't exists\n};
+            -f $blob_file or die qq{Error: "$blob_file" doesn't exists\n};
 
             # parse the bplist from the SQLite database for this entry
             my $bplist_obj = parseBPlist ($row->{file}, $file_id);
