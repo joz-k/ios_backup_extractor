@@ -389,9 +389,19 @@ sub extractMediaFiles
         or die "Error: Cannot open ‘$tmp_manifest_db’ as SQLite db: $DBI::errstr.\n";
 
     my $eval_ok = eval {
-        my $sql = 'SELECT fileID, domain, relativePath, file FROM files';
-        my $sth = $dbh->prepare ($sql);
-        $sth->execute();
+        my $sql = <<~SQL_END;
+            SELECT fileID, relativePath, file FROM files
+                WHERE domain='CameraRollDomain'
+                ORDER BY relativePath ASC
+            SQL_END
+
+        my $sth = $dbh->prepare ($sql)
+            or die qq{Error: 'prepare' method failed on ‘$tmp_manifest_db’ SQLite db:\n},
+                   qq{\t$DBI::errstr.\n};
+
+        $sth->execute()
+            or die qq{Warning: 'execute' method failed on ‘$tmp_manifest_db’ SQLite db:\n},
+                   qq{\t$DBI::errstr.\n};
 
         my $file_index = 1;
 
@@ -401,8 +411,7 @@ sub extractMediaFiles
             my $file_id = $row->{fileID};
             my $relative_path = $row->{relativePath};
 
-            next unless (   $row->{domain} eq 'CameraRollDomain'
-                         && $relative_path !~ /thumb/i
+            next unless (   $relative_path !~ /thumb/i
                          && $relative_path !~ /metadata/i
                          && $relative_path =~ /\.$wanted_extensions$/i);
 
@@ -1110,7 +1119,7 @@ sub createDeletedFileList ($tmp_fh)
 
     my $sth = $dbh->prepare ($sql)
         or do {
-            warn qq{Warning: 'prepare' method failed on ‘$tmp_photos_db’ SQLite db:},
+            warn qq{Warning: 'prepare' method failed on ‘$tmp_photos_db’ SQLite db:\n},
                  qq{\t$DBI::errstr.\n}
                         if $cmd_options{verbose};
 
@@ -1119,7 +1128,7 @@ sub createDeletedFileList ($tmp_fh)
 
     $sth->execute()
         or do {
-            warn qq{Warning: 'execute' method failed on ‘$tmp_photos_db’ SQLite db:},
+            warn qq{Warning: 'execute' method failed on ‘$tmp_photos_db’ SQLite db:\n},
                  qq{\t$DBI::errstr.\n}
                         if $cmd_options{verbose};
 
