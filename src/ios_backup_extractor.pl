@@ -400,7 +400,7 @@ sub extractMediaFiles
                    qq{\t$DBI::errstr.\n};
 
         $sth->execute()
-            or die qq{Warning: 'execute' method failed on ‘$tmp_manifest_db’ SQLite db:\n},
+            or die qq{Error: 'execute' method failed on ‘$tmp_manifest_db’ SQLite db:\n},
                    qq{\t$DBI::errstr.\n};
 
         my $file_index = 1;
