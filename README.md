@@ -21,6 +21,18 @@ Screenshots
 ![screenshot1](doc/res/win_screenshot1.png "Windows screenhost")
 ![screenshot1](doc/res/macos_screenshot1.png "MacOS screenhost")
 
+Troubleshooting
+---------------
+
+**Problem:** When I run this tool, I get the error message like `Not a HASH reference at ios_backup_extractor.pl line 729`.\
+**Solution:** This happens when the iOS backup is corrupted or incomplete. Just run the device backup again and the error
+       message should disappear.
+
+**Problem:** I run the tool on the MacOS and it says there are no iOS backups available or I see an error message
+             about directory access.
+**Solution:** Go to Settings, `Security & Privacy` → `Full Disk Access` and enable "Full Disk Access" for your
+              `Terminal` application.
+
 `--help` screen
 ---------------
 ```
