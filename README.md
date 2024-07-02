@@ -29,7 +29,7 @@ Troubleshooting
        message should disappear.
 
 **Problem:** I run the tool on the MacOS and it says there are no iOS backups available or I see an error message
-             about directory access.
+             about directory access.\
 **Solution:** Go to Settings, `Security & Privacy` → `Full Disk Access` and enable "Full Disk Access" for your
               `Terminal` application.
 
