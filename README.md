@@ -25,8 +25,8 @@ Troubleshooting
 ---------------
 
 **Problem:** When I run this tool, I get the error message like `Not a HASH reference at ios_backup_extractor.pl line 729`.\
-**Solution:** This happens when the iOS backup is corrupted or incomplete. Just run the device backup again and the error
-       message should disappear.
+**Solution:** There was a bug in an earlier version of this tool, that randomly caused this type of error on Windows.
+              Please use at least version 1.2.2 and this problem should be fixed.
 
 **Problem:** I run the tool on the MacOS and it says there are no iOS backups available or I see an error message
              about directory access.\
@@ -57,6 +57,7 @@ Options:
                         - ‘flat’ no subdirectories
   -s, --since DATE    Extract and copy only files created since DATE.
                         DATE must be in format YYYY-MM-DD.
+      --add-trash     Extract also items marked as deleted.
   -d, --dry           Dry run, don't copy any files.
   -v, --verbose       Show more information while running.
   -h, --help          Display help.
@@ -72,7 +73,7 @@ Examples:
       ios_backup_extractor.exe ABC123ABC123 -o "My Photos and Videos"
 
 Version:
-    1.2.1 (2024-03-21)
+    1.2.2 (2024-07-14)
 ```
 
 License
