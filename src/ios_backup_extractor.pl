@@ -29,7 +29,7 @@ use Mac::PropertyList::ReadBinary ();
 
 use constant {
     APP_NAME    => 'ios_backup_extractor',
-    APP_VERSION => '1.2.2 (2024-03-30)',
+    APP_VERSION => '1.2.2 (2024-07-14)',
 };
 
 my $wanted_extensions = 'jpg|jpeg|heic|png|mov';
@@ -717,7 +717,7 @@ sub readManifestPlist ($device_backup_dir)
     return (1, %{$g_manifest_plist_map{$device_backup_dir}})
         if (defined $g_manifest_plist_map{$device_backup_dir});
 
-    my $plist = parsePList ("$device_backup_dir/Manifest.plist");
+    my $plist = parseBinaryPList ("$device_backup_dir/Manifest.plist");
 
     return (0) unless $plist;
 
@@ -797,7 +797,7 @@ sub readStatusPlist ($device_backup_dir)
     return (1, %{$g_status_plist_map{$device_backup_dir}})
         if (defined $g_status_plist_map{$device_backup_dir});
 
-    my $plist = parsePList ("$device_backup_dir/Status.plist");
+    my $plist = parseBinaryPList ("$device_backup_dir/Status.plist");
 
     return (0) unless $plist;
 
