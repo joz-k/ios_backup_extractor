@@ -10,10 +10,10 @@ or "Apple Devices" application on Windows OS or the built-in Finder application 
 Download
 ---------
 
-* Windows x64: [iOS_Backup_Extractor-v1.2.1_x64-windows.exe.zip](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.1/iOS_Backup_Extractor-v1.2.1_x64-windows.exe.zip)
-* MacOS arm64: [iOS_Backup_Extractor-v1.2.1_arm64-macos.zip](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.1/iOS_Backup_Extractor-v1.2.1_arm64-macos.zip)
-* MacOS intel64: [iOS_Backup_Extractor-v1.2.1_intel64-macos.zip](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.1/iOS_Backup_Extractor-v1.2.1_intel64-macos.zip)
-* Linux x64: [iOS_Backup_Extractor-v1.2.1_x64_linux.tar.gz](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.1/iOS_Backup_Extractor-v1.2.1_x64_linux.tar.gz)
+* Windows x64: [iOS_Backup_Extractor-v1.2.2_x64-windows.exe.zip](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.2/iOS_Backup_Extractor-v1.2.2_x64-windows.exe.zip)
+* MacOS arm64: [iOS_Backup_Extractor-v1.2.2_arm64-macos.zip](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.2/iOS_Backup_Extractor-v1.2.2_arm64-macos.zip)
+* MacOS intel64: [iOS_Backup_Extractor-v1.2.2_intel64-macos.zip](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.2/iOS_Backup_Extractor-v1.2.2_intel64-macos.zip)
+* Linux x64: [iOS_Backup_Extractor-v1.2.2_x64_linux.tar.gz](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.2/iOS_Backup_Extractor-v1.2.2_x64_linux.tar.gz)
 
 Screenshots
 -----------
