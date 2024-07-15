@@ -24,7 +24,7 @@ Screenshots
 Motivation
 ----------
 
-This tool is designed to use unencrypted local iOS backups as a reliable and incremental way to export photos and videos from iOS devices without relying on any cloud services. Frequent (even daily) iOS backups are very efficient because they are incremental (only new or changed files are added to the backup). And this tool is also completely incremental. It never moves or overwrites files that have already been exported to a given output directory. 
+This tool is designed to use unencrypted local iOS backups as a reliable and incremental way to export photos and videos from iOS devices to your computer without relying on any cloud services. Frequent (even daily) iOS backups are very efficient because they are incremental (only new or changed files are added to the backup). And this tool is also completely incremental. It never moves or overwrites files that have already been exported to a given output directory. 
 
 **Note**: An unencrypted iOS backup won't contain most sensitive information from your iOS device. For example, passwords, Wi-Fi settings, website and call history, and health data are never transferred[^2]. So they are not as insecure as you might think. However, it is important to back up your iOS device data only to a fully secured computer.
 
