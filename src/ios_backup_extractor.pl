@@ -297,10 +297,8 @@ format STDOUT =
         my $device_backup_info_hashref = $all_devices_backup_hashref->{$serial};
         $name   = $device_backup_info_hashref->{Info}{'Display Name'};
         $device = $device_backup_info_hashref->{Info}{'Product Name'},
-        $backup_date = ($_ = $device_backup_info_hashref->{Info}{'Last Backup Date'})
-                     ? s/\A(\d{4})-(\d\d)-(\d\d)
-                         T(\d\d)\:(\d\d)\:(\d\d(?:\.\d+)?)Z\z/$1-$2-$3 $4:$5/xr
-                     : q{Unknown};
+        $backup_date = utcTimeToLocaltime (
+                                $device_backup_info_hashref->{Info}{'Last Backup Date'});
         $encrypted = $device_backup_info_hashref->{Manifest}{IsEncrypted}
                    ? 'Yes'
                    : 'No';
@@ -309,6 +307,21 @@ format STDOUT =
     }
 
     print "\n";
+}
+
+# ----------------------------------------------------------------
+
+sub utcTimeToLocaltime ($time)
+{
+    # $time is in format '2023-11-03T17:18:33Z'
+    $time =~ /\A \d{4}-\d\d-\d\d T \d\d\:\d\d\:\d\d (?:\.\d+)? Z \z/x
+        or return 'Unknown';
+
+    my $utc_tp = Time::Piece->strptime ($time, '%FT%TZ')
+        or return 'Unknown';
+
+    my $local_tp = Time::Piece->localtime ($utc_tp->epoch);
+    return $local_tp->strftime ('%Y-%m-%d %H:%M');
 }
 
 # ----------------------------------------------------------------
