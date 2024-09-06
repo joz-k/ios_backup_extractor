@@ -10,10 +10,10 @@ or "Apple Devices" application on Windows OS or the built-in Finder application 
 Download
 ---------
 
-* Windows x64: [iOS_Backup_Extractor-v1.2.2_x64-windows.exe.zip](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.2/iOS_Backup_Extractor-v1.2.2_x64-windows.exe.zip)
-* MacOS arm64: [iOS_Backup_Extractor-v1.2.2_arm64-macos.zip](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.2/iOS_Backup_Extractor-v1.2.2_arm64-macos.zip)
-* MacOS intel64: [iOS_Backup_Extractor-v1.2.2_intel64-macos.zip](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.2/iOS_Backup_Extractor-v1.2.2_intel64-macos.zip)
-* Linux x64: [iOS_Backup_Extractor-v1.2.2_x64_linux.tar.gz](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.2/iOS_Backup_Extractor-v1.2.2_x64_linux.tar.gz)
+* Windows x64: [iOS_Backup_Extractor-v1.2.3_x64-windows.exe.zip](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.3/iOS_Backup_Extractor-v1.2.3_x64-windows.exe.zip)
+* MacOS arm64: [iOS_Backup_Extractor-v1.2.3_arm64-macos.zip](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.3/iOS_Backup_Extractor-v1.2.3_arm64-macos.zip)
+* MacOS intel64: [iOS_Backup_Extractor-v1.2.3_intel64-macos.zip](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.3/iOS_Backup_Extractor-v1.2.3_intel64-macos.zip)
+* Linux x64: [iOS_Backup_Extractor-v1.2.3_x64_linux.tar.gz](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.3/iOS_Backup_Extractor-v1.2.3_x64_linux.tar.gz)
 
 Screenshots
 -----------
@@ -82,7 +82,7 @@ Examples:
       ios_backup_extractor.exe ABC123ABC123 -o "My Photos and Videos"
 
 Version:
-    1.2.2 (2024-07-14)
+    1.2.3 (2024-09-06)
 ```
 
 License
