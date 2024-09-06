@@ -32,7 +32,7 @@ use constant {
     APP_VERSION => '1.2.2 (2024-07-14)',
 };
 
-my $wanted_extensions = 'jpg|jpeg|heic|png|mov';
+my $wanted_extensions = 'jpg|jpeg|heic|png|mov|3gp|mp4';
 my @format_options    = qw(ym ymd flat);
 
 my $g_backup_dir         = undef;
