@@ -33,14 +33,21 @@ This tool is designed to use unencrypted local iOS backups as a reliable and inc
 Troubleshooting
 ---------------
 
-**Problem:** When I run this tool, I get the error message like `Not a HASH reference at ios_backup_extractor.pl line 729`.\
-**Solution:** There was a bug in an earlier version of this tool, that randomly caused this type of error on Windows.
-              Please use at least version 1.2.2 and this problem should be fixed.
+**Problem:** I launched the command on MacOS and it shows the message "`ios_backup_extractor` cannot be opened because the developer cannot be verified."\
+**Solution:** You need to add this command to security exceptions following these steps:
+ 1. In the Finder on your Mac, locate the app where it has been extracted (unzipped). 
+ 2. Control-click the `ios_backup_extractor` icon, then choose Open from the shortcut menu.
+ 3. Click Open. This opens the Terminal window, launches the application and saves a security exception for it.
+ 4. You can now run the tool from the command line as usual.
 
 **Problem:** I run the tool on the MacOS and it says there are no iOS backups available or I see an error message
              about directory access.\
 **Solution:** Go to Settings, `Security & Privacy` → `Full Disk Access` and enable "Full Disk Access" for your
               `Terminal` application.
+
+**Problem:** When I run this tool, I get the error message like `Not a HASH reference at ios_backup_extractor.pl line 729`.\
+**Solution:** There was a bug in an earlier version of this tool, that randomly caused this type of error on Windows.
+              Please use at least version 1.2.2 and this problem should be fixed.
 
 `--help` screen
 ---------------
