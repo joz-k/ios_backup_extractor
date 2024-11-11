@@ -471,6 +471,14 @@ sub extractMediaFiles
 
             # say STDERR "\tLastModified: ", $lastmodif_time_piece->strftime('%F %T');
 
+            # find the "Birth" date for this file
+            my $birh_time_piece
+                            = defined $bplist_obj
+                            ? getBirthTimeFromBPListObj ($bplist_obj, $file_id)
+                            : undef;
+
+            # say STDERR "\tBirth ", $birh_time_piece->strftime('%F %T');
+
             # skip if `--since` option is defined and this file is older than
             # specified DATE
             next if (   @g_since_date
@@ -511,8 +519,11 @@ sub extractMediaFiles
                 unless ($cmd_options{dry})
                 {
                     # copy file to output directory
-                    File::Copy::copy ($blob_file, "$out_sub_dir/$unique_filename")
+                    my $out_file = "$out_sub_dir/$unique_filename";
+                    File::Copy::copy ($blob_file, $out_file)
                                                or die "Error: File copy failed: $!\n";
+
+                    setFileAttributes($out_file, $lastmodif_time_piece, $birh_time_piece);
                 }
             }
 
@@ -1017,28 +1028,62 @@ sub parseBPlist ($bplist_file_info_blob, $file_id)
 
 # ----------------------------------------------------------------
 
-sub getLastModifiedTimeFromBPListObj ($bplist_obj, $file_id)
+sub getTimestampFromBPListObj ($bplist_obj, $file_id, $kind)
 {
     # verify expected structure layout
     unless (   ref $bplist_obj eq 'HASH'
             && ref $bplist_obj->{'$objects'} eq 'ARRAY'
             && scalar (@{$bplist_obj->{'$objects'}}) > 2
-            && defined $bplist_obj->{'$objects'}[1]{LastModified}
-            && $bplist_obj->{'$objects'}[1]{LastModified} =~ m/^\d+$/)
+            && defined $bplist_obj->{'$objects'}[1]{$kind}
+            && $bplist_obj->{'$objects'}[1]{$kind} =~ m/^\d+$/)
     {
-        warn qq{Warning: Cannot get LastModified time for fileID: $file_id\n}
+        warn qq{Warning: Cannot get $kind time for fileID: $file_id\n}
             if $cmd_options{verbose};
 
         return undef;
     }
 
-    # find the "LastModified" date for this file
-    my $last_modified_timestamp = $bplist_obj->{'$objects'}[1]{LastModified};
-    my $time_piece = Time::Piece::localtime ($last_modified_timestamp);
+    # find the "LastModified/Birth" date for this file
+    my $last_modified_timestamp = $bplist_obj->{'$objects'}[1]{$kind};
+    return Time::Piece::localtime ($last_modified_timestamp);
 }
 
 # ----------------------------------------------------------------
 
+sub getLastModifiedTimeFromBPListObj ($bplist_obj, $file_id)
+{
+    return getTimestampFromBPListObj ($bplist_obj, $file_id, 'LastModified');
+}
+
+# ----------------------------------------------------------------
+
+sub getBirthTimeFromBPListObj ($bplist_obj, $file_id)
+{
+    return getTimestampFromBPListObj ($bplist_obj, $file_id, 'Birth');
+}
+
+# ----------------------------------------------------------------
+
+sub setFileAttributes($file, $last_tp, $birh_tp)
+{
+    if ($^O =~ /mswin32/i)
+    {
+        require Win32API::File::Time;
+        Win32API::File::Time::SetFileTime ($file,
+                                           $last_tp->epoch,
+                                           $last_tp->epoch,
+                                           $birh_tp->epoch);
+    }
+    elsif ($^O =~ /darwin/i)
+    {
+    }
+    else
+    {
+    }
+}
+
+# ----------------------------------------------------------------
+                                                   #
 sub getDateSubDir ($lastmodif_time_piece)
 {
     if (lc $cmd_options{format} eq 'flat')
