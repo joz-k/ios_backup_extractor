@@ -1066,6 +1066,10 @@ sub getBirthTimeFromBPListObj ($bplist_obj, $file_id)
 
 sub setFileAttributes ($file, $last_tp, $birh_tp)
 {
+    my $setUtime = sub {
+        utime ($last_tp->epoch, $last_tp->epoch, $file);
+    };
+
     if ($^O =~ /mswin32/i)
     {
         require Win32API::File::Time;
@@ -1084,14 +1088,15 @@ sub setFileAttributes ($file, $last_tp, $birh_tp)
 
         system ('/usr/bin/SetFile', '-d', $birth_time_str,
                                     '-m', $modif_time_str,
-                                    $file);
+                                    $file) == 0
+            or $setUtime->();
     }
     else
     {
         # fallback for MacOS/Linux using utime system call
         # on MacOS, utime also modifies 'Date Created' attribute, if 'Date Modified'
         # is older than original 'Date Created' (which should be always the case)
-        utime ($last_tp->epoch, $last_tp->epoch, $file);
+        $setUtime->();
     }
 }
 
