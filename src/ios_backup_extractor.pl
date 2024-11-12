@@ -32,8 +32,12 @@ use constant {
     APP_VERSION => '1.2.3 (2024-09-06)',
 };
 
-my $wanted_extensions = 'jpg|jpeg|heic|png|mov|3gp|mp4';
-my @format_options    = qw(ym ymd flat);
+my $wanted_extensions    = 'jpg|jpeg|heic|png|mov|3gp|mp4';
+my @format_options       = qw(ym ymd flat);
+my %prepend_date_formats = ( 'dash'       => '%Y-%m-%d_',
+                             'underscore' => '%Y_%m_%d_',
+                             'none'       => '%Y%m%d_'  ,
+                           );
 
 my $g_backup_dir         = undef;
 my $g_out_dir            = undef;
@@ -54,15 +58,17 @@ my %cmd_options;
 Getopt::Long::GetOptions(
     \%cmd_options,
     'help|h',
-    'list|l',     # list available device backups
-    'format|f=s', # output subdirectory format
-    'since|s=s',  # since DATE
-    'add-trash',  # extract also files from deleted
-    'verbose|v',  # display more info and warnings
-    'dry|d',      # “dry run”: doesn't make any real changes to the filesystem
-    'out|o=s',    # output directory
-    'list-long',  # more detailed device backup listing than --list
-    'debug',      # enable internal debug messages (warning: a huge stderr output)
+    'list|l',       # list available device backups
+    'format|f=s',   # output subdirectory format
+    'since|s=s',    # since DATE
+    'add-trash',    # extract also files from deleted
+    'verbose|v',    # display more info and warnings
+    'dry|d',        # “dry run”: doesn't make any real changes to the filesystem
+    'out|o=s',      # output directory
+    'list-long',    # more detailed device backup listing than --list
+    'prepend-date', # prepend date to each filename
+    'prepend-date-separator=s', # '-' (default), '_', None
+    'debug',        # enable internal debug messages (warning: a huge stderr output)
 ) or exit 1; # EXIT_FAILURE;
 
 main();
@@ -99,6 +105,14 @@ sub printHelp
           -s, --since DATE    Extract and copy only files created since DATE.
                                 DATE must be in format YYYY-MM-DD.
               --add-trash     Extract also items marked as deleted.
+              --prepend-date  Prepend a media creation date to each exported filename.
+                              Default format is YYYY-MM-DD.
+              --prepend-date-separator SEPARATOR
+                              Change the separator for '--prepend-date' format.
+                              Possible values are:
+                                - ‘dash’ (default)
+                                - ‘underscore’
+                                - ‘none’
           -d, --dry           Dry run, don't copy any files.
           -v, --verbose       Show more information while running.
           -h, --help          Display help.
@@ -472,12 +486,12 @@ sub extractMediaFiles
             # say STDERR "\tLastModified: ", $lastmodif_time_piece->strftime('%F %T');
 
             # find the "Birth" date for this file
-            my $birh_time_piece
+            my $birth_time_piece
                             = defined $bplist_obj
                             ? getBirthTimeFromBPListObj ($bplist_obj, $file_id)
                             : undef;
 
-            # say STDERR "\tBirth ", $birh_time_piece->strftime('%F %T');
+            # say STDERR "\tBirth ", $birth_time_piece->strftime('%F %T');
 
             # skip if `--since` option is defined and this file is older than
             # specified DATE
@@ -494,7 +508,10 @@ sub extractMediaFiles
             mkdir ($out_sub_dir) unless (-d $out_sub_dir or $cmd_options{dry});
 
             # find a suitable filename (or `undef` if duplicate)
-            my $unique_filename = findUniqueFilename ($blob_file, $filename, $out_sub_dir);
+            my $unique_filename = findUniqueFilename ($blob_file,
+                                                      $filename,
+                                                      $out_sub_dir,
+                                                      $lastmodif_time_piece);
 
             if (   not($cmd_options{'add-trash'})
                 && $g_deleted_files{$relative_path})
@@ -523,7 +540,7 @@ sub extractMediaFiles
                     File::Copy::copy ($blob_file, $out_file)
                                                or die "Error: File copy failed: $!\n";
 
-                    setFileAttributes ($out_file, $lastmodif_time_piece, $birh_time_piece);
+                    setFileAttributes ($out_file, $lastmodif_time_piece, $birth_time_piece);
                 }
             }
 
@@ -593,6 +610,12 @@ sub checkAndSetArgs
 
         @g_since_date = ($year, $month, $day);
     }
+
+    # prepend date separator must be one of those from %prepend_date_formats
+    $cmd_options{'prepend-date-separator'} //= 'dash';
+    grep { $_ eq lc $cmd_options{'prepend-date-separator'} } keys %prepend_date_formats
+        or die q{Error: --prepend-date-separator must be one of the following: }
+               . join (', ', keys %prepend_date_formats) . qq{\n};
 
     # args OK, no need to show help screen
     return 0;
@@ -939,10 +962,17 @@ sub olderThanSince ($file_modif_timepiece, $since_date_aref)
 
 # ----------------------------------------------------------------
 
-sub findUniqueFilename ($blob_file, $filename, $out_sub_dir)
+sub findUniqueFilename ($blob_file, $filename, $out_sub_dir, $lastmodif_time_piece)
 {
     # check if the filename is unique. If there is a file with the same name,
     # check if it is a duplicate. If not, find a new unique name for this file.
+
+    if ($cmd_options{'prepend-date'} && defined $lastmodif_time_piece)
+    {
+        $filename = $lastmodif_time_piece->strftime (
+                            $prepend_date_formats{lc $cmd_options{'prepend-date-separator'}})
+                  . $filename;
+    }
 
     # file doesn't exist, return the same filename
     return $filename if (not -e "$out_sub_dir/$filename");
@@ -1064,8 +1094,10 @@ sub getBirthTimeFromBPListObj ($bplist_obj, $file_id)
 
 # ----------------------------------------------------------------
 
-sub setFileAttributes ($file, $last_tp, $birh_tp)
+sub setFileAttributes ($file, $last_tp, $birth_tp)
 {
+    (defined $last_tp && defined $birth_tp) or return;
+
     my $setUtime = sub {
         utime ($last_tp->epoch, $last_tp->epoch, $file);
     };
@@ -1076,14 +1108,14 @@ sub setFileAttributes ($file, $last_tp, $birh_tp)
         Win32API::File::Time::SetFileTime ($file,
                                            $last_tp->epoch,
                                            $last_tp->epoch,
-                                           $birh_tp->epoch);
+                                           $birth_tp->epoch);
     }
     elsif ($^O =~ /darwin/i && macOsHasSetFileCmd())
     {
         # MacOS with SetFile command installed
         # Note: SetFile command is deprecated and installed with the Command
         #       line developers tools
-        my $birth_time_str = $birh_tp->strftime ('%m/%d/%Y %H:%M');
+        my $birth_time_str = $birth_tp->strftime ('%m/%d/%Y %H:%M');
         my $modif_time_str = $last_tp->strftime ('%m/%d/%Y %H:%M');
 
         system ('/usr/bin/SetFile', '-d', $birth_time_str,
