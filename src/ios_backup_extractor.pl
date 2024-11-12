@@ -98,18 +98,21 @@ sub printHelp
 
         Options:
           -f, --format FORMAT Determines a directory structure created in the output
-                              directory. Valid values are:
+                                directory. Valid values are:
                                 - ‘ym’  for subdirectories like YYYY-MM (default)
                                 - ‘ymd’ for subdirectories like YYYY-MM-DD
                                 - ‘flat’ no subdirectories
           -s, --since DATE    Extract and copy only files created since DATE.
-                                DATE must be in format YYYY-MM-DD.
+                                DATE must be in format YYYY-MM-DD or one
+                                of the following special keywords:
+                                - ‘last-week’
+                                - ‘last-month’
               --add-trash     Extract also items marked as deleted.
               --prepend-date  Prepend a media creation date to each exported filename.
-                              Default format is YYYY-MM-DD.
+                                Default format is YYYY-MM-DD.
               --prepend-date-separator SEPARATOR
                               Change the separator for '--prepend-date' format.
-                              Possible values are:
+                                Possible values are:
                                 - ‘dash’ (default)
                                 - ‘underscore’
                                 - ‘none’
@@ -605,6 +608,25 @@ sub checkAndSetArgs
     # read the `since` date if defined
     if (defined (my $since_arg = $cmd_options{since}))
     {
+        $since_arg =~ s/_/-/g;
+
+        if (lc ($since_arg) eq 'last-week')
+        {
+            # now, minus 8 days
+            my $since_last_week = (Time::Piece::localtime) - (8 * 24 * 60 * 60);
+            $since_arg = $since_last_week->strftime('%Y-%m-%d');
+            say STDERR qq{Info: Computed 'last-week' date: "$since_arg"}
+                if $cmd_options{verbose};
+        }
+        elsif (lc ($since_arg) eq 'last-month')
+        {
+            # now, minus 32 days
+            my $since_last_month = (Time::Piece::localtime) - (32 * 24 * 60 * 60);
+            $since_arg = $since_last_month->strftime('%Y-%m-%d');
+            say STDERR qq{Info: Computed 'last-month' date: "$since_arg"}
+                if $cmd_options{verbose};
+        }
+
         my ($date_ok, $year, $month, $day) = parseIsoDate ($since_arg);
         $date_ok or die qq{Error: Invalid --since DATE: "$since_arg"\n};
 
