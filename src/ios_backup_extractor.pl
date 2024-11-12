@@ -523,7 +523,7 @@ sub extractMediaFiles
                     File::Copy::copy ($blob_file, $out_file)
                                                or die "Error: File copy failed: $!\n";
 
-                    setFileAttributes($out_file, $lastmodif_time_piece, $birh_time_piece);
+                    setFileAttributes ($out_file, $lastmodif_time_piece, $birh_time_piece);
                 }
             }
 
@@ -1064,7 +1064,7 @@ sub getBirthTimeFromBPListObj ($bplist_obj, $file_id)
 
 # ----------------------------------------------------------------
 
-sub setFileAttributes($file, $last_tp, $birh_tp)
+sub setFileAttributes ($file, $last_tp, $birh_tp)
 {
     if ($^O =~ /mswin32/i)
     {
@@ -1074,16 +1074,42 @@ sub setFileAttributes($file, $last_tp, $birh_tp)
                                            $last_tp->epoch,
                                            $birh_tp->epoch);
     }
-    elsif ($^O =~ /darwin/i)
+    elsif ($^O =~ /darwin/i && macOsHasSetFileCmd())
     {
+        # MacOS with SetFile command installed
+        # Note: SetFile command is deprecated and installed with the Command
+        #       line developers tools
+        my $birth_time_str = $birh_tp->strftime ('%m/%d/%Y %H:%M');
+        my $modif_time_str = $last_tp->strftime ('%m/%d/%Y %H:%M');
+
+        system ('/usr/bin/SetFile', '-d', $birth_time_str,
+                                    '-m', $modif_time_str,
+                                    $file);
     }
     else
     {
+        # fallback for MacOS/Linux using utime system call
+        # on MacOS, utime also modifies 'Date Created' attribute, if 'Date Modified'
+        # is older than original 'Date Created' (which should be always the case)
+        utime ($last_tp->epoch, $last_tp->epoch, $file);
     }
 }
 
 # ----------------------------------------------------------------
-                                                   #
+
+sub macOsHasSetFileCmd ()
+{
+    my $hasSetFileCmd = sub {
+        my $out = `/usr/bin/SetFile 2>&1`;
+        return $out && $out =~ /^\s*usage/si;
+    };
+
+    state $hasSetFile = $hasSetFileCmd->();
+    return !!($hasSetFile);
+}
+
+# ----------------------------------------------------------------
+
 sub getDateSubDir ($lastmodif_time_piece)
 {
     if (lc $cmd_options{format} eq 'flat')
