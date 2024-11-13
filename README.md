@@ -13,10 +13,10 @@ or "[Apple Devices][apple-devices-url]" application on Windows OS or the built-i
 Download
 ---------
 
-* Windows x64: [iOS_Backup_Extractor-v1.2.3_x64-windows.exe.zip](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.3/iOS_Backup_Extractor-v1.2.3_x64-windows.exe.zip)
-* MacOS arm64: [iOS_Backup_Extractor-v1.2.3_arm64-macos.zip](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.3/iOS_Backup_Extractor-v1.2.3_arm64-macos.zip)
-* MacOS intel64: [iOS_Backup_Extractor-v1.2.3_intel64-macos.zip](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.3/iOS_Backup_Extractor-v1.2.3_intel64-macos.zip)
-* Linux x64: [iOS_Backup_Extractor-v1.2.3_x64_linux.tar.gz](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.3/iOS_Backup_Extractor-v1.2.3_x64_linux.tar.gz)
+* Windows x64: [iOS_Backup_Extractor-v1.2.4_x64-windows.exe.zip](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.4/iOS_Backup_Extractor-v1.2.4_x64-windows.exe.zip)
+* MacOS arm64: [iOS_Backup_Extractor-v1.2.4_arm64-macos.zip](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.4/iOS_Backup_Extractor_v1.2.4_arm64-macos.zip)
+* MacOS intel64: [iOS_Backup_Extractor-v1.2.4_intel64-macos.zip](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.4/iOS_Backup_Extractor-v1.2.4_intel64-macos.zip)
+* Linux x64: [iOS_Backup_Extractor-v1.2.4_x64_linux.tar.gz](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.4/iOS_Backup_Extractor-v1.2.4_x64_linux.tar.gz)
 
 Screenshots
 -----------
@@ -70,13 +70,24 @@ Commands:
 
 Options:
   -f, --format FORMAT Determines a directory structure created in the output
-                      directory. Valid values are:
+                        directory. Valid values are:
                         - ‘ym’  for subdirectories like YYYY-MM (default)
                         - ‘ymd’ for subdirectories like YYYY-MM-DD
                         - ‘flat’ no subdirectories
   -s, --since DATE    Extract and copy only files created since DATE.
-                        DATE must be in format YYYY-MM-DD.
+                        DATE must be in format YYYY-MM-DD or one
+                        of the following special keywords:
+                        - ‘last-week’
+                        - ‘last-month’
       --add-trash     Extract also items marked as deleted.
+      --prepend-date  Prepend a media creation date to each exported filename.
+                        Default format is YYYY-MM-DD.
+      --prepend-date-separator SEPARATOR
+                      Change the separator for '--prepend-date' format.
+                        Possible values are:
+                        - ‘dash’ (default)
+                        - ‘underscore’
+                        - ‘none’
   -d, --dry           Dry run, don't copy any files.
   -v, --verbose       Show more information while running.
   -h, --help          Display help.
@@ -92,7 +103,7 @@ Examples:
       ios_backup_extractor.exe ABC123ABC123 -o "My Photos and Videos"
 
 Version:
-    1.2.3 (2024-09-06)
+    1.2.4 (2024-11-13)
 ```
 
 License
