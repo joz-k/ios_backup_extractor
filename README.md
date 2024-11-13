@@ -18,6 +18,9 @@ Download
 * MacOS intel64: [iOS_Backup_Extractor-v1.2.4_intel64-macos.zip](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.4/iOS_Backup_Extractor-v1.2.4_intel64-macos.zip)
 * Linux x64: [iOS_Backup_Extractor-v1.2.4_x64_linux.tar.gz](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.4/iOS_Backup_Extractor-v1.2.4_x64_linux.tar.gz)
 
+> [!NOTE]
+> Please refer to the "[Troubleshooting](#troubleshooting)" section if the provided binaries display error messages.
+
 Screenshots
 -----------
 
