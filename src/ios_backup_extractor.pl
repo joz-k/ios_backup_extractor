@@ -1071,10 +1071,6 @@ sub parseBPlist ($bplist_file_info_blob, $file_id)
     print STDERR 'Debug: ', Mac::PropertyList::plist_as_string ($plist)
         if $cmd_options{debug};
 
-    # print bplist as perl obj in debug mode
-    print STDERR 'Debug: ', Data::Dumper::Dumper ($bplist_obj)
-        if $cmd_options{debug};
-
     return $bplist_obj;
 }
 
