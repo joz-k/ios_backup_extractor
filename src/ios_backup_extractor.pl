@@ -32,7 +32,7 @@ use constant {
     APP_VERSION => '1.2.4 (2024-11-13)',
 };
 
-my $wanted_extensions    = 'jpg|jpeg|heic|png|mov|3gp|mp4|dng';
+my $wanted_extensions    = 'jpg|jpeg|heic|dng|png|mov|3gp|mp4|gif|webp';
 my @format_options       = qw(ym ymd flat);
 my %prepend_date_formats = ( 'dash'       => '%Y-%m-%d_',
                              'underscore' => '%Y_%m_%d_',
