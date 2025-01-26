@@ -1422,4 +1422,9 @@ __END__
 # • e74113c185fd8297e140cfcf9c99436c5cc06b57 : Web History
 # • 992df473bbb9e132f4b3b6e4d33f72171e97bc7a : Voice Mails
 # • 1fa8656eab4eef2f4f6388aea16cc5389bb78123 : Books, table ZBKLIBRARYASSET
+#
+# These file hashes appear to be generated using the following method:
+#   sha1(domain + '-' + relative_filename)
+# E.g. sha1("CameraRollDomain-Media/PhotoData/Metadata/DCIM/105APPLE/IMG_5541.JPG")
+#      -> ed71022dae64bb9b40b5de2c5a12d428e156e9b9
 
