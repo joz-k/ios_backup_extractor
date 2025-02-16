@@ -434,6 +434,8 @@ sub extractMediaFiles
                    qq{\t$DBI::errstr.\n};
 
         my $file_index = 1;
+        my $media_location = q{};
+        my $media_subdir   = q{};
 
         # filter all full-size JPG, HEIC... images
         while (my $row = $sth->fetchrow_hashref)
@@ -446,14 +448,18 @@ sub extractMediaFiles
                          && $relative_path =~ /\.$wanted_extensions$/i);
 
             # determine filename
-            unless ($relative_path =~ m{^ .+
-                                        /DCIM
-                                        /\d+APPLE
-                                        /(?<filename>[^./]+)(?:\.|/)
+            unless ($relative_path =~ m{^
+                                        (?<media_location>
+                                            .+
+                                            /DCIM/)
+                                        (?<media_subdir>
+                                            \d+APPLE/)
+                                        (?<filename>
+                                            [^./]+)
+                                        (?:\.|/)
                                         .*
                                         (?<extension>
-                                           (?i:$wanted_extensions)
-                                        )
+                                           (?i:$wanted_extensions))
                                         $
                                        }x)
             {
@@ -462,6 +468,12 @@ sub extractMediaFiles
                     if ($cmd_options{verbose});
 
                 next;
+            }
+
+            if ($media_location ne $+{media_location} || $media_subdir ne $+{media_subdir})
+            {
+                ($media_location, $media_subdir) = ($+{media_location}, $+{media_subdir});
+                say STDERR "  ╭────┤Extracting from: [${media_location}$media_subdir]";
             }
 
             # add '_DELETED' flag to files marked as deleted
