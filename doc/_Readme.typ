@@ -1,5 +1,5 @@
 // Create `Readme.pdf` using following command:
-// typst compile Readme.typ Readme.pdf
+// typst compile _Readme.typ Readme.pdf
 
 #import "@preview/note-me:0.4.0": *
 
