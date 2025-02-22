@@ -447,13 +447,34 @@ sub extractMediaFiles
                          && $relative_path !~ /metadata/i
                          && $relative_path =~ /\.$wanted_extensions$/i);
 
-            # determine filename
+            # determine filename, e.g.
+            # [DCIM]
+            # * Media/DCIM/101APPLE/IMG_1111.JPG
+            # * Media/PhotoData/Mutations/DCIM/101APPLE/IMG_1111/Adjustments/FullSizeRender.jpg
             unless ($relative_path =~ m{^
                                         (?<media_location>
                                             .+
                                             /DCIM/)
                                         (?<media_subdir>
                                             \d+APPLE/)
+                                        (?<filename>
+                                            [^./]+)
+                                        (?:\.|/)
+                                        .*
+                                        (?<extension>
+                                           (?i:$wanted_extensions))
+                                        $
+                                       }x
+            # [iCloud]
+            # * Media/PhotoData/CPLAssets/group101/1A1A1A1A-1A1A-1A1A-1A1A-1A1A1A1A1A1A.HEIC
+            # * Media/PhotoData/Mutations/PhotoData/CPLAssets/group101 \
+            #             /1A1A1A1A-1A1A-1A1A-1A1A-1A1A1A1A1A1A/Adjustments/FullSizeRender.jpg
+                 or $relative_path =~ m{^
+                                        (?<media_location>
+                                            .+
+                                            /PhotoData/CPLAssets/)
+                                        (?<media_subdir>
+                                            group\d+/)
                                         (?<filename>
                                             [^./]+)
                                         (?:\.|/)
