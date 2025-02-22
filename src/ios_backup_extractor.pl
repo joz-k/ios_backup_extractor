@@ -497,12 +497,10 @@ sub extractMediaFiles
                 say STDERR "  ╭────┤Extracting from: [${media_location}$media_subdir]";
             }
 
-            # add '_DELETED' flag to files marked as deleted
-            my $deleted_flag = ($cmd_options{'add-trash'} && $g_deleted_files{$relative_path})
-                             ? '_DELETED'
-                             : q{};
+            my $is_icloud_media = index ($media_location, 'CPLAssets') != -1;
 
-            my $filename = $+{filename} . $deleted_flag . q{.} . lc $+{extension};
+            # save the filename and extension from the regex match
+            my ($re_filename, $re_extension) = ($+{filename}, $+{extension});
 
             # find the file in the blob storage
             my $subdir = $file_id =~ s/^(\w\w).+$/$1/r
@@ -512,6 +510,18 @@ sub extractMediaFiles
 
             # parse the bplist from the SQLite database for this entry
             my $bplist_obj = parseBPlist ($row->{file}, $file_id);
+
+            # DEBUG
+            #my $obj_dump = Data::Dumper::Dumper ($bplist_obj);
+            #$obj_dump =~ s/[^\x20-\x7E\x0A]/{β}/g;  # Replaces non-printable characters
+            #say ($obj_dump);
+
+            # add '_DELETED' flag to files marked as deleted
+            my $deleted_flag = ($cmd_options{'add-trash'} && $g_deleted_files{$relative_path})
+                             ? '_DELETED'
+                             : q{};
+
+            my $filename = $re_filename . $deleted_flag . q{.} . lc $re_extension;
 
             # find the "LastModified" date for this file
             my $lastmodif_time_piece
