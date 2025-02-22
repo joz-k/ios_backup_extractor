@@ -837,7 +837,7 @@ sub readManifestPlist ($device_backup_dir)
 
     # add entries from the `Lockdown` section
     my %lockdown_entries = (
-                             # defaule values
+                             # default values
                              ( SerialNumber   => q{},
                                UniqueDeviceID => q{} ),
 
