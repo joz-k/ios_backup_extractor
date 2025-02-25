@@ -3,6 +3,9 @@
 
 #import "@preview/note-me:0.4.0": *
 
+// Set the page size to match the iPad Air 13-inch screen
+#set page(width: 197.61mm, height: 263.27mm)
+
 #show link: set text(fill: blue)
 #show link: underline
 
