@@ -52,6 +52,8 @@ use constant {
     kError        => 2,
 };
 
+my $s_extension_regex = qr{\.$wanted_extensions$}i;
+
 # define command line options
 my %cmd_options;
 
@@ -68,6 +70,7 @@ Getopt::Long::GetOptions(
     'list-long',    # more detailed device backup listing than --list
     'prepend-date', # prepend date to each filename
     'prepend-date-separator=s', # '-' (default), '_', None
+    'ignore-icloud-media',      # skip files from iCloud
     'debug',        # enable internal debug messages (warning: a huge stderr output)
 ) or exit 1; # EXIT_FAILURE;
 
@@ -116,6 +119,8 @@ sub printHelp
                                 - ‘dash’ (default)
                                 - ‘underscore’
                                 - ‘none’
+              --ignore-icloud-media
+                              Do not extract media downloaded to the device from iCloud.
           -d, --dry           Dry run, don't copy any files.
           -v, --verbose       Show more information while running.
           -h, --help          Display help.
@@ -380,6 +385,79 @@ sub displayBackupListLong ($all_devices_backup_hashref)
 
 # ----------------------------------------------------------------
 
+sub mapICloudUuidToFilename ($manifest_dbh, $db_file)
+{
+    my $sql = <<~SQL_END;
+        SELECT relativePath, file FROM files
+            WHERE domain='CameraRollDomain'
+            AND relativePath LIKE 'Media/PhotoData/CPLAssets/%'
+        SQL_END
+
+    my $sth = $manifest_dbh->prepare ($sql)
+        or die qq{Error: 'prepare' method failed on ‘$db_file’ SQLite db:\n},
+               qq{\t$DBI::errstr.\n};
+
+    $sth->execute()
+        or die qq{Error: 'execute' method failed on ‘$db_file’ SQLite db:\n},
+               qq{\t$DBI::errstr.\n};
+
+    my %icloud_uuid_filename_map;
+
+    while (my $row = $sth->fetchrow_hashref)
+    {
+        # skip files with an unsuitable extension right away
+        defined $row->{relativePath} && $row->{relativePath} =~ $s_extension_regex
+            or next;
+
+        my $bplist_obj = defined $row->{file} && !ref ($row->{file}) &&
+                         parseBPlist ($row->{file}, $db_file);
+        $bplist_obj or next;
+
+        my $ext_bplist =    ref $bplist_obj eq 'HASH'
+                         && defined $bplist_obj->{'$objects'}
+                         && ref $bplist_obj->{'$objects'} eq 'ARRAY'
+                         && scalar (@{$bplist_obj->{'$objects'}}) > 4
+                         && defined $bplist_obj->{'$objects'}[3]
+                         && !ref ($bplist_obj->{'$objects'}[3])
+                         && parseBPlist ($bplist_obj->{'$objects'}[3], $db_file);
+        $ext_bplist or next;
+
+        my $orig_filename =    ref $ext_bplist eq 'HASH'
+                            && $ext_bplist->{'com.apple.assetsd.originalFilename'};
+        defined $orig_filename or next;
+        # Remove the file extension
+        $orig_filename =~ s/\.[^.]+$//;
+
+        my $cloud_id = $ext_bplist->{'com.apple.assetsd.cloudAsset.UUID'};
+        defined $cloud_id or next;
+
+        # create dictionary of cloudAsset.UUID => filename
+        $icloud_uuid_filename_map{$cloud_id} = $orig_filename;
+    }
+
+    return \%icloud_uuid_filename_map;
+}
+
+# ----------------------------------------------------------------
+
+sub replaceICloudFilename ($icloud_uuid_filename, $icloud_uid_filename_ref)
+{
+    my ($icloud_uuid, $extension) = ($icloud_uuid_filename =~ /^(.*?)(\.[^.]+)$/);
+    $icloud_uuid //= $icloud_uuid_filename;
+    $extension   //= q{};
+
+    if (defined $icloud_uid_filename_ref->{$icloud_uuid})
+    {
+        return $icloud_uid_filename_ref->{$icloud_uuid} . $extension;
+    }
+    else
+    {
+        return $icloud_uuid_filename;
+    }
+}
+
+# ----------------------------------------------------------------
+
 sub extractMediaFiles
 {
     say STDERR q{Info: "--dry" mode enabled. No files will be copied.}
@@ -418,6 +496,13 @@ sub extractMediaFiles
                             })
         or die "Error: Cannot open ‘$tmp_manifest_db’ as SQLite db: $DBI::errstr.\n";
 
+    # create the list of original iCloud filenames
+    my $icloud_uid_filename_ref = mapICloudUuidToFilename ($dbh, $tmp_manifest_db)
+        unless $cmd_options{'ignore-icloud-media'};
+    # DEBUG
+    say STDERR Data::Dumper::Dumper ($icloud_uid_filename_ref);
+
+    # list all media files
     my $eval_ok = eval {
         my $sql = <<~SQL_END;
             SELECT fileID, relativePath, file FROM files
@@ -437,7 +522,44 @@ sub extractMediaFiles
         my $media_location = q{};
         my $media_subdir   = q{};
 
-        # filter all full-size JPG, HEIC... images
+        # precompiled regexes
+        # [DCIM]
+        # * Media/DCIM/101APPLE/IMG_1111.JPG
+        # * Media/PhotoData/Mutations/DCIM/101APPLE/IMG_1111/Adjustments/FullSizeRender.jpg
+        my $dcim_regex = qr{^
+                            (?<media_location>
+                                .+
+                                /DCIM/)
+                            (?<media_subdir>
+                                \d+APPLE/)
+                            (?<filename>
+                                [^./]+)
+                            (?:\.|/)
+                            .*
+                            (?<extension>
+                                (?i:$wanted_extensions))
+                            $
+                           }x;
+        # [iCloud]
+        # * Media/PhotoData/CPLAssets/group101/1A1A1A1A-1A1A-1A1A-1A1A-1A1A1A1A1A1A.HEIC
+        # * Media/PhotoData/Mutations/PhotoData/CPLAssets/group101 \
+        #             /1A1A1A1A-1A1A-1A1A-1A1A-1A1A1A1A1A1A/Adjustments/FullSizeRender.jpg
+        my $icld_regex = qr{^
+                            (?<media_location>
+                                .+
+                                /PhotoData/CPLAssets/)
+                            (?<media_subdir>
+                                group\d+/)
+                            (?<filename>
+                                [^./]+)
+                            (?:\.|/)
+                            .*
+                            (?<extension>
+                                (?i:$wanted_extensions))
+                            $
+                           }x;
+
+        # filter all full-size JPG, HEIC, MOV... media files
         while (my $row = $sth->fetchrow_hashref)
         {
             my $file_id = $row->{fileID};
@@ -445,44 +567,11 @@ sub extractMediaFiles
 
             next unless (   $relative_path !~ /thumb/i
                          && $relative_path !~ /metadata/i
-                         && $relative_path =~ /\.$wanted_extensions$/i);
+                         && $relative_path =~ $s_extension_regex);
 
-            # determine filename, e.g.
-            # [DCIM]
-            # * Media/DCIM/101APPLE/IMG_1111.JPG
-            # * Media/PhotoData/Mutations/DCIM/101APPLE/IMG_1111/Adjustments/FullSizeRender.jpg
-            unless ($relative_path =~ m{^
-                                        (?<media_location>
-                                            .+
-                                            /DCIM/)
-                                        (?<media_subdir>
-                                            \d+APPLE/)
-                                        (?<filename>
-                                            [^./]+)
-                                        (?:\.|/)
-                                        .*
-                                        (?<extension>
-                                           (?i:$wanted_extensions))
-                                        $
-                                       }x
-            # [iCloud]
-            # * Media/PhotoData/CPLAssets/group101/1A1A1A1A-1A1A-1A1A-1A1A-1A1A1A1A1A1A.HEIC
-            # * Media/PhotoData/Mutations/PhotoData/CPLAssets/group101 \
-            #             /1A1A1A1A-1A1A-1A1A-1A1A-1A1A1A1A1A1A/Adjustments/FullSizeRender.jpg
-                 or $relative_path =~ m{^
-                                        (?<media_location>
-                                            .+
-                                            /PhotoData/CPLAssets/)
-                                        (?<media_subdir>
-                                            group\d+/)
-                                        (?<filename>
-                                            [^./]+)
-                                        (?:\.|/)
-                                        .*
-                                        (?<extension>
-                                           (?i:$wanted_extensions))
-                                        $
-                                       }x)
+            # filter and match predefined files, like full-size JPG, HEIC, MOV...
+            unless (   $relative_path =~ $dcim_regex  # [DCIM]
+                    or $relative_path =~ $icld_regex) # [iCloud]
             {
                 warn   qq{Warning: Cannot determine filename from "$relative_path"\n}
                      . qq{\tfileID: $file_id\n}
@@ -490,6 +579,9 @@ sub extractMediaFiles
 
                 next;
             }
+
+            # save the filename and extension from the regex match
+            my ($re_filename, $re_extension) = ($+{filename}, $+{extension});
 
             if ($media_location ne $+{media_location} || $media_subdir ne $+{media_subdir})
             {
@@ -499,8 +591,8 @@ sub extractMediaFiles
 
             my $is_icloud_media = index ($media_location, 'CPLAssets') != -1;
 
-            # save the filename and extension from the regex match
-            my ($re_filename, $re_extension) = ($+{filename}, $+{extension});
+            # skip media from iCloud if requested
+            next if ($is_icloud_media && $cmd_options{'ignore-icloud-media'});
 
             # find the file in the blob storage
             my $subdir = $file_id =~ s/^(\w\w).+$/$1/r
@@ -511,17 +603,18 @@ sub extractMediaFiles
             # parse the bplist from the SQLite database for this entry
             my $bplist_obj = parseBPlist ($row->{file}, $file_id);
 
-            # DEBUG
-            #my $obj_dump = Data::Dumper::Dumper ($bplist_obj);
-            #$obj_dump =~ s/[^\x20-\x7E\x0A]/{β}/g;  # Replaces non-printable characters
-            #say ($obj_dump);
+            # replace iCloud UUID filename with an original filename
+            my $orig_filename = $is_icloud_media
+                              ? replaceICloudFilename ($re_filename, $icloud_uid_filename_ref)
+                              : $re_filename;
 
             # add '_DELETED' flag to files marked as deleted
-            my $deleted_flag = ($cmd_options{'add-trash'} && $g_deleted_files{$relative_path})
-                             ? '_DELETED'
-                             : q{};
+            my $file_is_deleted = $g_deleted_files{$relative_path};
+            my $deleted_suffix  = ($cmd_options{'add-trash'} && $file_is_deleted)
+                                ? '_DELETED'
+                                : q{};
 
-            my $filename = $re_filename . $deleted_flag . q{.} . lc $re_extension;
+            my $filename = $orig_filename . $deleted_suffix . q{.} . lc $re_extension;
 
             # find the "LastModified" date for this file
             my $lastmodif_time_piece
@@ -532,10 +625,9 @@ sub extractMediaFiles
             # say STDERR "\tLastModified: ", $lastmodif_time_piece->strftime('%F %T');
 
             # find the "Birth" date for this file
-            my $birth_time_piece
-                            = defined $bplist_obj
-                            ? getBirthTimeFromBPListObj ($bplist_obj, $file_id)
-                            : undef;
+            my $birth_time_piece = defined $bplist_obj
+                                 ? getBirthTimeFromBPListObj ($bplist_obj, $file_id)
+                                 : undef;
 
             # say STDERR "\tBirth ", $birth_time_piece->strftime('%F %T');
 
@@ -545,7 +637,7 @@ sub extractMediaFiles
                      && defined $lastmodif_time_piece
                      && olderThanSince ($lastmodif_time_piece, \@g_since_date));
 
-            # determine output directory baseod on LastModified date
+            # determine output directory based on LastModified date
             my $date_sub_dir = getDateSubDir ($lastmodif_time_piece);
             my $out_sub_dir = $g_out_dir;
             $out_sub_dir .= "/$date_sub_dir" if $date_sub_dir ne q{};
@@ -559,8 +651,7 @@ sub extractMediaFiles
                                                       $out_sub_dir,
                                                       $lastmodif_time_piece);
 
-            if (   not($cmd_options{'add-trash'})
-                && $g_deleted_files{$relative_path})
+            if (not($cmd_options{'add-trash'}) && $file_is_deleted)
             {
                 printf "%3d. ($subdir/$file_id) %-13s → <IN_TRASH>, Skipping...\n",
                        $file_index, $filename;
@@ -1252,7 +1343,7 @@ sub sqliteTableExists ($dbh, $table_name, $db_filename)
 sub createDeletedFileList ($tmp_fh)
 {
     # Deleted media info is located in:
-    #   SQLite: 12/12b144c0bd44f2b3dffd9186d3f9c05b917cee25
+    #   SQLite: 12/12b144c0bd44f2b3dffd9186d3f9c05b917cee25 (Media/PhotoData/Photos.sqlite)
     #   Table:  ZASSET
     #   Column: Z_PK          (Primary Key)
     #   Column: ZTRASHEDSTATE (1 if deleted)
