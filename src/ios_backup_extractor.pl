@@ -499,8 +499,6 @@ sub extractMediaFiles
     # create the list of original iCloud filenames
     my $icloud_uid_filename_ref = mapICloudUuidToFilename ($dbh, $tmp_manifest_db)
         unless $cmd_options{'ignore-icloud-media'};
-    # DEBUG
-    say STDERR Data::Dumper::Dumper ($icloud_uid_filename_ref);
 
     # list all media files
     my $eval_ok = eval {
@@ -583,16 +581,16 @@ sub extractMediaFiles
             # save the filename and extension from the regex match
             my ($re_filename, $re_extension) = ($+{filename}, $+{extension});
 
+            my $is_icloud_media = index ($+{media_location}, 'CPLAssets') != -1;
+
+            # skip media from iCloud if requested
+            next if ($is_icloud_media && $cmd_options{'ignore-icloud-media'});
+
             if ($media_location ne $+{media_location} || $media_subdir ne $+{media_subdir})
             {
                 ($media_location, $media_subdir) = ($+{media_location}, $+{media_subdir});
                 say STDERR "  ╭────┤Extracting from: [${media_location}$media_subdir]";
             }
-
-            my $is_icloud_media = index ($media_location, 'CPLAssets') != -1;
-
-            # skip media from iCloud if requested
-            next if ($is_icloud_media && $cmd_options{'ignore-icloud-media'});
 
             # find the file in the blob storage
             my $subdir = $file_id =~ s/^(\w\w).+$/$1/r
