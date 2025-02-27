@@ -29,7 +29,7 @@ use Mac::PropertyList::ReadBinary ();
 
 use constant {
     APP_NAME    => 'ios_backup_extractor',
-    APP_VERSION => '1.2.4 (2024-11-13)',
+    APP_VERSION => '1.2.5 (2025-02-28)',
 };
 
 my $wanted_extensions    = 'jpg|jpeg|heic|dng|png|mov|3gp|mp4|gif|webp';
