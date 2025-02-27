@@ -52,7 +52,7 @@ use constant {
     kError        => 2,
 };
 
-my $s_extension_regex = qr{\.$wanted_extensions$}i;
+my $s_extension_regex = qr{\.(?:$wanted_extensions)$}i;
 
 # define command line options
 my %cmd_options;
