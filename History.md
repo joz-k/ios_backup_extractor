@@ -1,14 +1,31 @@
 HISTORY of the iOS Backup Extractor
 ===================================
 
+1.2.5   (2025-02-28)
+--------------------
+
+* Added `.gif` and `.webp` to the list of exported files.
+
+    Files with these extensions are also exported from the camera roll.
+
+* Enhanced text output during extraction.
+
+    When extracting, the tool will now display the name of the internal "DCIM"
+    folder where the media file was originally located in the device/backup
+    filesystem.
+
+* iCloud media extraction.
+
+    Media files downloaded to the device from iCloud are also exported during
+    the extraction process. To skip these files, the new `--ignore-icloud-media`
+    option can be used.
+  
 1.2.4   (2024-11-13)
 --------------------
 
 * After export, media files have "Date Created" and "Date Modified" filesystem
   metadata attributes modified to reflect the dates originally set when created
   by iOS.
-
-    Requested by #4.
 
 * Implemented `--prepend-date` and `--prepend-date-separator` options.
 
