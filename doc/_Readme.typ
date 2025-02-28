@@ -1,15 +1,19 @@
 // Create `Readme.pdf` using following command:
 // typst compile _Readme.typ Readme.pdf
 
+#let version_num = "1.2.5"
+
 #import "@preview/note-me:0.4.0": *
 
 // Set the page size to match the iPad Air 13-inch screen
-#set page(width: 197.61mm, height: 263.27mm)
+#set page(width: 197.61mm, height: 263.27mm,
+          numbering: "1")
 
 #show link: set text(fill: blue)
 #show link: underline
 
-= iOS Backup Extractor v1.2.4
+
+= iOS Backup Extractor v#version_num
 
 `ios_backup_extractor` is a free command line utility to extract media files
 (photos and videos) from a local #emph[unencrypted] iOS device backup. This
@@ -112,6 +116,8 @@ Options:
                         - ‘dash’ (default)
                         - ‘underscore’
                         - ‘none’
+      --ignore-icloud-media
+                      Do not extract media downloaded to the device from iCloud.
   -d, --dry           Dry run, don't copy any files.
   -v, --verbose       Show more information while running.
   -h, --help          Display help.
@@ -125,9 +131,6 @@ Examples:
   to 'My Photos and Videos' directory. Such directory must exists already.
 
       ios_backup_extractor.exe ABC123ABC123 -o "My Photos and Videos"
-
-Version:
-    1.2.4 (2024-11-13)
 ```
 
 == License
