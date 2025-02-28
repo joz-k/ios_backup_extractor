@@ -13,10 +13,10 @@ or "[Apple Devices][apple-devices-url]" application on Windows OS or the built-i
 Download
 ---------
 
-* Windows x64: [iOS_Backup_Extractor-v1.2.4_x64-windows.exe.zip](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.4/iOS_Backup_Extractor-v1.2.4_x64-windows.exe.zip)
-* MacOS arm64: [iOS_Backup_Extractor-v1.2.4_arm64-macos.zip](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.4/iOS_Backup_Extractor_v1.2.4_arm64-macos.zip)
-* MacOS intel64: [iOS_Backup_Extractor-v1.2.4_intel64-macos.zip](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.4/iOS_Backup_Extractor-v1.2.4_intel64-macos.zip)
-* Linux x64: [iOS_Backup_Extractor-v1.2.4_x64_linux.tar.gz](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.4/iOS_Backup_Extractor-v1.2.4_x64_linux.tar.gz)
+* Windows x64: [iOS_Backup_Extractor-v1.2.5_x64-windows.zip](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.5/iOS_Backup_Extractor-v1.2.5_x64-windows.zip)
+* MacOS arm64: [iOS_Backup_Extractor-v1.2.5_arm64-macos.zip](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.5/iOS_Backup_Extractor-v1.2.5_arm64-macos.zip)
+* MacOS intel64: [iOS_Backup_Extractor-v1.2.5_intel64-macos.zip](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.5/iOS_Backup_Extractor-v1.2.5_intel64-macos.zip)
+* Linux x64: [iOS_Backup_Extractor-v1.2.5_x64-linux.tar.gz](https://github.com/joz-k/ios_backup_extractor/releases/download/v1.2.5/iOS_Backup_Extractor-v1.2.5_x64-linux.tar.gz)
 
 For a full history of changes, see the [Change History](History.md).
 
@@ -89,6 +89,8 @@ Options:
                         - ‘dash’ (default)
                         - ‘underscore’
                         - ‘none’
+      --ignore-icloud-media
+                      Do not extract media downloaded to the device from iCloud.
   -d, --dry           Dry run, don't copy any files.
   -v, --verbose       Show more information while running.
   -h, --help          Display help.
@@ -104,7 +106,7 @@ Examples:
       ios_backup_extractor.exe ABC123ABC123 -o "My Photos and Videos"
 
 Version:
-    1.2.4 (2024-11-13)
+    1.2.5 (2025-02-28)
 ```
 
 License
