@@ -48,6 +48,14 @@ Troubleshooting
  3. Click Open. This opens the Terminal window, launches the application and saves a security exception for it.
  4. You can now run the tool from the command line as usual.
 
+Since MacOS 15, you also need to:
+
+ * Open System Settings.
+ * Navigate to Privacy & Security.
+ * Scroll down to the Security section.
+ * Look for a message about the blocked application (e.g., "ios_backup_extractor was blocked from opening because it is not from an identified developer").
+ * Click _Allow Anyway_ next to the `ios_backup_extractor` app name.
+
 **Problem:** I run the tool on the MacOS and it says there are no iOS backups available or I see an error message
              about directory access.\
 **Solution:** Go to Settings, `Security & Privacy` → `Full Disk Access` and enable "Full Disk Access" for your
