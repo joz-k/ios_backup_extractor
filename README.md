@@ -1,5 +1,9 @@
-iOS Backup Extractor
-====================
+<h1 align="center">
+  <img src="doc/res/logo.png" alt="logo" width="200px">
+  <br>
+  iOS Backup Extractor
+  <br>
+</h1>
 
 `ios_backup_extractor` is a free command line utility to extract media files (photos and videos)
 from a local _unencrypted_ iOS device backup. This type of backup is typically created by Apple's [iTunes][itunes-url]
