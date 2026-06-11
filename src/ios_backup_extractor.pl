@@ -478,7 +478,7 @@ sub extractMediaFiles
         if ($cmd_options{verbose});
 
     # make the list of deleted files to skip (if requested)
-    createDeletedFileList ($tmp_fh);
+    createAuxFileList ($tmp_fh);
 
     # copy `Manifest.db` to the temporary directory
     my $orig_manifest_db = "$g_backup_dir/Manifest.db";
@@ -1338,7 +1338,7 @@ sub sqliteTableExists ($dbh, $table_name, $db_filename)
 
 # ----------------------------------------------------------------
 
-sub createDeletedFileList ($tmp_fh)
+sub createAuxFileList ($tmp_fh)
 {
     # Deleted media info is located in:
     #   SQLite: 12/12b144c0bd44f2b3dffd9186d3f9c05b917cee25 (Media/PhotoData/Photos.sqlite)
@@ -1348,21 +1348,21 @@ sub createDeletedFileList ($tmp_fh)
     #   Column: ZTRASHEDDATE  (not NULL if deleted)
     #   Column: ZDIRECTORY    (e.g. 'DCIM/103/APPLE')
     #   Column: ZFILENAME     (e.g. 'IMG_6600.JPG)
-    my $photos_db = '12/12b144c0bd44f2b3dffd9186d3f9c05b917cee25';
+    my $photos_db_chksum_filename = '12/12b144c0bd44f2b3dffd9186d3f9c05b917cee25';
 
     # copy `Photos.sqlite` to the temporary directory
-    my $tmp_photos_db = qq[${\($tmp_fh->dirname)}/Photos.sqlite];
+    my $photos_db_filename = qq[${\($tmp_fh->dirname)}/Photos.sqlite];
 
-    unless (File::Copy::copy ("$g_backup_dir/$photos_db", $tmp_photos_db))
+    unless (File::Copy::copy ("$g_backup_dir/$photos_db_chksum_filename", $photos_db_filename))
     {
         warn qq{Warning: Cannot copy or find Photos.sqlite database\n},
-             qq{\tfileID: $photos_db\n}
+             qq{\tfileID: $photos_db_chksum_filename\n}
                     if $cmd_options{verbose};
 
         return;
     }
 
-    my $dbh = DBI->connect ("dbi:SQLite:dbname=$tmp_photos_db",
+    my $dbh = DBI->connect ("dbi:SQLite:dbname=$photos_db_filename",
                             undef,
                             undef,
                             {
@@ -1372,25 +1372,40 @@ sub createDeletedFileList ($tmp_fh)
 
     unless ($dbh)
     {
-        warn qq{Warning: Cannot open ‘$tmp_photos_db’ as SQLite db: $DBI::errstr.\n}
+        warn qq{Warning: Cannot open '$photos_db_filename' as SQLite db: $DBI::errstr.\n}
             if $cmd_options{verbose};
 
         return;
     }
 
+    # Call the function to create deleted file list
+    createDeletedFileList ($dbh, $photos_db_filename);
+
+    $dbh->disconnect
+        or do {
+            warn qq{Warning: Cannot properly disconnect '$photos_db_filename' SQLite db:},
+                 qq{\t$DBI::errstr.\n}
+                        if $cmd_options{verbose};
+        };
+}
+
+# ----------------------------------------------------------------
+
+sub createDeletedFileList ($dbh, $photos_db_filename)
+{
     # check if the ZASSET table exists
-    sqliteTableExists ($dbh, 'ZASSET', $tmp_photos_db)
+    sqliteTableExists ($dbh, 'ZASSET', $photos_db_filename)
         or return;
 
     # read the list of deleted media files
-    my $sql = <<~SQL_END;
+    my $sql = <<~'SQL_END';
         SELECT ZDIRECTORY, ZFILENAME FROM ZASSET
             WHERE ZTRASHEDSTATE = 1;
         SQL_END
 
     my $sth = $dbh->prepare ($sql)
         or do {
-            warn qq{Warning: 'prepare' method failed on ‘$tmp_photos_db’ SQLite db:\n},
+            warn qq{Warning: 'prepare' method failed on '$photos_db_filename' SQLite db:\n},
                  qq{\t$DBI::errstr.\n}
                         if $cmd_options{verbose};
 
@@ -1399,7 +1414,7 @@ sub createDeletedFileList ($tmp_fh)
 
     $sth->execute()
         or do {
-            warn qq{Warning: 'execute' method failed on ‘$tmp_photos_db’ SQLite db:\n},
+            warn qq{Warning: 'execute' method failed on '$photos_db_filename' SQLite db:\n},
                  qq{\t$DBI::errstr.\n}
                         if $cmd_options{verbose};
 
@@ -1414,13 +1429,6 @@ sub createDeletedFileList ($tmp_fh)
         say STDERR qq{Info: File marked as deleted: $del_file_relpath}
             if ($cmd_options{verbose});
     }
-
-    $dbh->disconnect
-        or do {
-            warn qq{Warning: Cannot properly disconnect ‘$tmp_photos_db’ SQLite db:},
-                 qq{\t$DBI::errstr.\n}
-                        if $cmd_options{verbose};
-        };
 }
 
 # ----------------------------------------------------------------
