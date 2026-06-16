@@ -642,21 +642,23 @@ sub extractMediaFiles
                      && defined $lastmodif_time_piece
                      && olderThanSince ($lastmodif_time_piece, \@g_since_date));
 
-            # determine output directory based on album, date, or just output directory
+            # determine output directory and display filename based on album or date
             my $out_sub_dir = $g_out_dir;
-            my $date_sub_dir = q{};  # initialize to empty string
+            my $display_sub_dir = q{};  # for display purposes
 
-            # if the file belongs to an album and we're not ignoring album folders
             if (!$cmd_options{'ignore-album-folders'} && exists $g_album_files{$relative_path})
             {
-                my $album_name = sanitizeAlbumNameForFolder($g_album_files{$relative_path});
+                # using album name as subdirectory
+                my $album_name = sanitizeAlbumNameForFolder ($g_album_files{$relative_path});
                 $out_sub_dir .= "/$album_name";
+                $display_sub_dir = $album_name;
             }
             else
             {
                 # use date-based subdirectory if not in an album or if ignoring album folders
-                $date_sub_dir = getDateSubDir ($lastmodif_time_piece);
+                my $date_sub_dir = getDateSubDir ($lastmodif_time_piece);
                 $out_sub_dir .= "/$date_sub_dir" if $date_sub_dir ne q{};
+                $display_sub_dir = $date_sub_dir;
             }
 
             # create the output directory (if needed)
@@ -680,8 +682,8 @@ sub extractMediaFiles
             }
             else
             {
-                my $display_filename = $date_sub_dir ne q{}
-                                     ? "$date_sub_dir/$unique_filename"
+                my $display_filename = $display_sub_dir ne q{}
+                                     ? "$display_sub_dir/$unique_filename"
                                      : $unique_filename;
 
                 printf "%3d. ($subdir/$file_id) %-13s → $display_filename\n",
