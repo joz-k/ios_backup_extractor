@@ -1442,6 +1442,125 @@ sub createDeletedFileList ($dbh, $photos_db_filename)
 sub createAlbumFileMap ($dbh, $photos_db_filename)
 {
     # map photos to albums using data from Photos.sqlite database
+
+    # 1. dynamically find the junction table by its "shape"
+    # Apple's Photos app is built using a framework called "Core Data"
+    # (doc: https://developer.apple.com/documentation/coredata)
+    #
+    # Core Data is Apple's object-graph management framework. iOS developers do
+    # not manually write SQL 'CREATE TABLE' queries. Instead, they define data
+    # visually in code, and Core Data auto-generates the SQLite schema behind
+    # the scenes.
+    #
+    # Because it is auto-generated:
+    #   - Almost all tables and columns are prefixed with a "Z".
+    #   - Internal relationship tables (like the one linking Albums to Photos)
+    #     are assigned numeric IDs that can shift randomly during iOS updates
+    #     (e.g., The table might be named "Z_26ASSETS" on one phone, but
+    #     "Z_29ASSETS" on another phone).
+    #
+    # Due to this, we ignore the numeric names. We ask SQLite to look at the schema
+    # of every table and find the exact one that contains an "ALBUMS" column
+    # and an "ASSETS" column.
+    my $sth_tables = $dbh->prepare(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'Z_%'");
+    $sth_tables->execute();
+
+    my ($junction_table, $album_col, $asset_col);
+
+    # iterate over all Z_ tables
+    while (my @row = $sth_tables->fetchrow_array())
+    {
+        my $tbl = $row[0];
+
+        # PRAGMA `table_info` returns the blueprint (columns) of a table
+        my $sth_pragma = $dbh->prepare ("PRAGMA table_info($tbl)");
+        $sth_pragma->execute();
+
+        my ($c_album, $c_asset);
+
+        # read column definitions for the current table
+        while (my $col_info = $sth_pragma->fetchrow_hashref())
+        {
+            my $col_name = $col_info->{name};
+
+            # look for a column linking to Albums (e.g., `Z_29ALBUMS`)
+            if ($col_name =~ /^Z_\d+ALBUMS$/)
+            {
+                $c_album = $col_name;
+            }
+            # look for a column linking to Assets/Photos (e.g., `Z_3ASSETS`)
+            if ($col_name =~ /^Z_\d+ASSETS$/)
+            {
+                $c_asset = $col_name;
+            }
+        }
+
+        # if a table has BOTH columns, we found the hidden link between Albums and Photos!
+        if ($c_album && $c_asset)
+        {
+            $junction_table = $tbl;
+            $album_col = $c_album;
+            $asset_col = $c_asset;
+
+            # tell DBI we are done fetching rows from this query before breaking the loop
+            $sth_tables->finish();
+            last;
+        }
+    }
+
+    unless ($junction_table)
+    {
+        # clean up safely before dying
+        $sth_tables->finish() if $sth_tables;
+        warn qq{Warning: Could not identify junction table in '$photos_db_filename'\n}
+            if $cmd_options{verbose};
+        return;
+    }
+
+    say STDERR qq{Info: Album Core Data Schema: Junction Table: "$junction_table", }
+             . qq{Album Column: "$album_col", Asset Column: "$asset_col"}
+        if ($cmd_options{verbose});
+
+    # 2. extract the Albums and Media Paths using the discovered columns
+    # ZGENERICALBUM: The Core Data table holding Album names.
+    # ZASSET: The Core Data table holding Photo/Video filenames.
+    # We join them together using the dynamic Junction Table we just discovered.
+    my $query = <<~"SQL_END";
+        SELECT
+            alb.ZTITLE AS AlbumName,
+            /* Construct the full original iPhone path (e.g., Media/DCIM/100APPLE/IMG_001.JPG) */
+            'Media/' || ast.ZDIRECTORY || '/' || ast.ZFILENAME AS RelativePath
+        FROM ZGENERICALBUM alb
+        JOIN $junction_table junc ON alb.Z_PK        = junc.$album_col
+        JOIN ZASSET ast           ON junc.$asset_col = ast.Z_PK
+        WHERE alb.ZTITLE IS NOT NULL 
+          AND alb.ZKIND = 2         /* ZKIND 2 = User-created albums
+                                       (ignores folders/system smart albums) for now */
+          AND ast.ZTRASHEDSTATE = 0 /* ZTRASHEDSTATE 0 = Not deleted */
+        SQL_END
+
+    my $sth_query = $dbh->prepare ($query);
+    $sth_query->execute();
+
+    # fetch all results
+    my $results = $sth_query->fetchall_arrayref();
+
+    # 3. populate the global album files hash
+    foreach my $row (@$results)
+    {
+        my ($album_name, $relative_path) = @$row;
+
+        # map relative path to album name
+        $g_album_files{$relative_path} = $album_name;
+
+        say STDERR qq{Info: File assigned to album: "$relative_path" => "$album_name"}
+            if ($cmd_options{verbose});
+    }
+
+    # 4. cleanup
+    # redundant finish calls just to guarantee a clean exit for DBI
+    $sth_query->finish();
 }
 
 # ----------------------------------------------------------------
