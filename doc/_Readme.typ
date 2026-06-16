@@ -136,5 +136,5 @@ Examples:
 == License
 
 © 2026 #link("https://github.com/joz-k/")[joz-k],
-#link("http://www.perlfoundation.org/artistic_license_2_0")[Artistic License
+#link("https://perlfoundation.org/artistic-license-20.html")[Artistic License
 2.0]
