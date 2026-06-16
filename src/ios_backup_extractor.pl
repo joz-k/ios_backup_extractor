@@ -1442,6 +1442,25 @@ sub createDeletedFileList ($dbh, $photos_db_filename)
 sub createAlbumFileMap ($dbh, $photos_db_filename)
 {
     # map photos to albums using data from Photos.sqlite database
+    
+    # check if the required tables exist
+    sqliteTableExists ($dbh, 'ZGENERICALBUM', $photos_db_filename)
+        or do {
+            warn qq{Warning: 'ZGENERICALBUM' table does not exist in '$photos_db_filename':\n},
+                 qq{\t$DBI::errstr.\n}
+                        if $cmd_options{verbose};
+
+            return;
+        };
+    
+    sqliteTableExists ($dbh, 'ZASSET', $photos_db_filename)
+        or do {
+            warn qq{Warning: 'ZASSET' table does not exist in '$photos_db_filename':\n},
+                 qq{\t$DBI::errstr.\n}
+                        if $cmd_options{verbose};
+
+            return;
+        };
 
     # 1. dynamically find the junction table by its "shape"
     # Apple's Photos app is built using a framework called "Core Data"
@@ -1464,7 +1483,14 @@ sub createAlbumFileMap ($dbh, $photos_db_filename)
     # and an "ASSETS" column.
     my $sth_tables = $dbh->prepare(
                     "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'Z_%'");
-    $sth_tables->execute();
+    $sth_tables->execute()
+        or do {
+            warn qq{Warning: 'execute' method failed on '$photos_db_filename' SQLite db:\n},
+                 qq{\t$DBI::errstr.\n}
+                        if $cmd_options{verbose};
+
+            return;
+        };
 
     my ($junction_table, $album_col, $asset_col);
 
@@ -1475,7 +1501,14 @@ sub createAlbumFileMap ($dbh, $photos_db_filename)
 
         # PRAGMA `table_info` returns the blueprint (columns) of a table
         my $sth_pragma = $dbh->prepare ("PRAGMA table_info($tbl)");
-        $sth_pragma->execute();
+        $sth_pragma->execute()
+            or do {
+                warn qq{Warning: 'execute' method failed on '$photos_db_filename' SQLite db:\n},
+                     qq{\t$DBI::errstr.\n}
+                            if $cmd_options{verbose};
+
+                return;
+            };
 
         my ($c_album, $c_asset);
 
@@ -1541,7 +1574,14 @@ sub createAlbumFileMap ($dbh, $photos_db_filename)
         SQL_END
 
     my $sth_query = $dbh->prepare ($query);
-    $sth_query->execute();
+    $sth_query->execute()
+        or do {
+            warn qq{Warning: 'execute' method failed on '$photos_db_filename' SQLite db:\n},
+                 qq{\t$DBI::errstr.\n}
+                        if $cmd_options{verbose};
+
+            return;
+        };
 
     # fetch all results
     my $results = $sth_query->fetchall_arrayref();
