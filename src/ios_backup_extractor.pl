@@ -1442,7 +1442,7 @@ sub createDeletedFileList ($dbh, $photos_db_filename)
 sub createAlbumFileMap ($dbh, $photos_db_filename)
 {
     # map photos to albums using data from Photos.sqlite database
-    
+
     # check if the required tables exist
     sqliteTableExists ($dbh, 'ZGENERICALBUM', $photos_db_filename)
         or do {
@@ -1452,7 +1452,7 @@ sub createAlbumFileMap ($dbh, $photos_db_filename)
 
             return;
         };
-    
+
     sqliteTableExists ($dbh, 'ZASSET', $photos_db_filename)
         or do {
             warn qq{Warning: 'ZASSET' table does not exist in '$photos_db_filename':\n},
