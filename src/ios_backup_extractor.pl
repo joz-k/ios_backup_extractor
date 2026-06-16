@@ -18,13 +18,15 @@ use File::Temp     ();
 use File::Copy     ();
 use File::Spec     ();
 use File::Basename ();
+use Encode         ();
 use Digest::SHA    ();
 use DBI            ();
 use DBD::SQLite    ();
 use DBD::SQLite::Constants qw[:file_open];
-use Term::ReadKey     ();
-use IO::Interactive   ();
-use Mac::PropertyList ();
+use Term::ReadKey      ();
+use IO::Interactive    ();
+use Mac::PropertyList  ();
+use Unicode::Normalize ();
 use Mac::PropertyList::ReadBinary ();
 
 use constant {
@@ -71,6 +73,7 @@ Getopt::Long::GetOptions(
     'list-long',    # more detailed device backup listing than --list
     'prepend-date', # prepend date to each filename
     'prepend-date-separator=s', # '-' (default), '_', None
+    'ignore-album-folders',     # do not create user album folders
     'ignore-icloud-media',      # skip files from iCloud
     'debug',        # enable internal debug messages (warning: a huge stderr output)
 ) or exit 1; # EXIT_FAILURE;
@@ -120,6 +123,8 @@ sub printHelp
                                 - ‘dash’ (default)
                                 - ‘underscore’
                                 - ‘none’
+              --ignore-album-folders
+                              Do not create user album folders.
               --ignore-icloud-media
                               Do not extract media downloaded to the device from iCloud.
           -d, --dry           Dry run, don't copy any files.
@@ -637,10 +642,22 @@ sub extractMediaFiles
                      && defined $lastmodif_time_piece
                      && olderThanSince ($lastmodif_time_piece, \@g_since_date));
 
-            # determine output directory based on LastModified date
-            my $date_sub_dir = getDateSubDir ($lastmodif_time_piece);
+            # determine output directory based on album, date, or just output directory
             my $out_sub_dir = $g_out_dir;
-            $out_sub_dir .= "/$date_sub_dir" if $date_sub_dir ne q{};
+            my $date_sub_dir = q{};  # initialize to empty string
+
+            # if the file belongs to an album and we're not ignoring album folders
+            if (!$cmd_options{'ignore-album-folders'} && exists $g_album_files{$relative_path})
+            {
+                my $album_name = sanitizeAlbumNameForFolder($g_album_files{$relative_path});
+                $out_sub_dir .= "/$album_name";
+            }
+            else
+            {
+                # use date-based subdirectory if not in an album or if ignoring album folders
+                $date_sub_dir = getDateSubDir ($lastmodif_time_piece);
+                $out_sub_dir .= "/$date_sub_dir" if $date_sub_dir ne q{};
+            }
 
             # create the output directory (if needed)
             mkdir ($out_sub_dir) unless (-d $out_sub_dir or $cmd_options{dry});
@@ -1603,6 +1620,79 @@ sub createAlbumFileMap ($dbh, $photos_db_filename)
     # 4. cleanup
     # redundant finish calls just to guarantee a clean exit for DBI
     $sth_query->finish();
+}
+
+# ----------------------------------------------------------------
+
+sub sanitizeAlbumNameForFolder ($album_name)
+{
+    # sanitize album name for use as directory name
+
+    # handle `undef` gracefully to prevent uninitialized warnings
+    $album_name //= '';
+
+    # 1. normalize Unicode to Precomposed Form (NFC)
+    $album_name = Unicode::Normalize::NFC ($album_name);
+
+    # 2. strip ASCII control characters (0x00-0x1F, 0x7F)
+    $album_name =~ s/[\x00-\x1F\x7F]/_/g;
+
+    # 3. peplace illegal filesystem characters
+    $album_name =~ s/[<>:"\/\\|?*]/_/g;
+
+    # 4. trim leading whitespace
+    $album_name =~ s/^\s+//;
+
+    # 5. trim trailing whitespace and dots
+    $album_name =~ s/[\s.]+$//;
+
+    # 6. prevent unix command-line flag injection
+    $album_name =~ s/^-/_/;
+
+    # 7. fallback for empty or meaningless strings
+    # If the substitutions left us with nothing, OR a string composed entirely
+    # of underscores (e.g., input was "????" or "<>"), provide a safe fallback.
+    if ($album_name eq '' || $album_name =~ /^_+$/)
+    {
+        $album_name = 'Unknown_Album';
+    }
+
+    # 8. safe filesystem byte truncation (Max 240 Bytes for Ext4/APFS)
+    # Fast-path: Coarse trim at the character (UTF-8) level.
+    # Since 1 char >= 1 byte, the string can never legitimately exceed 240 chars.
+    if (length ($album_name) > 240)
+    {
+        $album_name = substr ($album_name, 0, 240);
+    }
+    # fine-tune: trim at the raw byte level to handle multi-byte chars (Emoji/Kanji).
+    # chop() drops whole logical characters so we never split a byte sequence in half.
+    while (length (Encode::encode ('UTF-8', $album_name)) > 240)
+    {
+        chop $album_name;
+    }
+
+    # truncation might have exposed new trailing spaces/dots, re-clean:
+    $album_name =~ s/[\s.]+$//;
+
+    # second pass fallback in case truncation destroyed the whole valid string
+    if ($album_name eq '' || $album_name =~ /^_+$/)
+    {
+        $album_name = 'Unknown_Album';
+    }
+
+    # 9. handle windows reserved device names
+    if ($album_name =~ /^(?i:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\..*)?$/)
+    {
+        $album_name = "_$album_name";
+    }
+
+    # 10. handle unix reserved directory navigation links
+    if ($album_name eq '.' || $album_name eq '..')
+    {
+        $album_name = "_$album_name";
+    }
+
+    return $album_name;
 }
 
 # ----------------------------------------------------------------
