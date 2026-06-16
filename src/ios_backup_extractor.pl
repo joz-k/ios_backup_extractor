@@ -494,6 +494,7 @@ sub extractMediaFiles
                             {
                                 sqlite_open_flags => SQLITE_OPEN_READONLY,
                                 PrintError => 0,
+                                sqlite_unicode => 1,
                             })
         or die "Error: Cannot open ‘$tmp_manifest_db’ as SQLite db: $DBI::errstr.\n";
 
@@ -1363,6 +1364,7 @@ sub createAuxFileList ($tmp_fh)
                             {
                                 sqlite_open_flags => SQLITE_OPEN_READONLY,
                                 PrintError => 0,
+                                sqlite_unicode => 1,
                             });
 
     unless ($dbh)
