@@ -124,4 +124,4 @@ Version:
 License
 -------
 
-© 2025  [joz-k](https://github.com/joz-k/), [Artistic License 2.0](http://www.perlfoundation.org/artistic_license_2_0)
+© 2026  [joz-k](https://github.com/joz-k/), [Artistic License 2.0](http://www.perlfoundation.org/artistic_license_2_0)
