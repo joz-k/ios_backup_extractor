@@ -43,6 +43,7 @@ my $g_backup_dir         = undef;
 my $g_out_dir            = undef;
 my @g_since_date         = (); # (YYYY, MM, DD)
 my %g_deleted_files      = ();
+my %g_album_files        = ();
 my %g_manifest_plist_map = ();
 my %g_status_plist_map   = ();
 
@@ -1378,8 +1379,11 @@ sub createAuxFileList ($tmp_fh)
         return;
     }
 
-    # Call the function to create deleted file list
+    # create deleted file list
     createDeletedFileList ($dbh, $photos_db_filename);
+
+    # create album file map
+    createAlbumFileMap ($dbh, $photos_db_filename);
 
     $dbh->disconnect
         or do {
@@ -1429,6 +1433,13 @@ sub createDeletedFileList ($dbh, $photos_db_filename)
         say STDERR qq{Info: File marked as deleted: $del_file_relpath}
             if ($cmd_options{verbose});
     }
+}
+
+# ----------------------------------------------------------------
+
+sub createAlbumFileMap ($dbh, $photos_db_filename)
+{
+    # map photos to albums using data from Photos.sqlite database
 }
 
 # ----------------------------------------------------------------
