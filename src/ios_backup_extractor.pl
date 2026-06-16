@@ -1341,14 +1341,8 @@ sub sqliteTableExists ($dbh, $table_name, $db_filename)
 
 sub createAuxFileList ($tmp_fh)
 {
-    # Deleted media info is located in:
-    #   SQLite: 12/12b144c0bd44f2b3dffd9186d3f9c05b917cee25 (Media/PhotoData/Photos.sqlite)
-    #   Table:  ZASSET
-    #   Column: Z_PK          (Primary Key)
-    #   Column: ZTRASHEDSTATE (1 if deleted)
-    #   Column: ZTRASHEDDATE  (not NULL if deleted)
-    #   Column: ZDIRECTORY    (e.g. 'DCIM/103/APPLE')
-    #   Column: ZFILENAME     (e.g. 'IMG_6600.JPG)
+    # locate and open `Photos.sqlite` datebase
+    # file: 12/12b144c0bd44f2b3dffd9186d3f9c05b917cee25 (Media/PhotoData/Photos.sqlite)
     my $photos_db_chksum_filename = '12/12b144c0bd44f2b3dffd9186d3f9c05b917cee25';
 
     # copy `Photos.sqlite` to the temporary directory
@@ -1400,6 +1394,14 @@ sub createDeletedFileList ($dbh, $photos_db_filename)
     # check if the ZASSET table exists
     sqliteTableExists ($dbh, 'ZASSET', $photos_db_filename)
         or return;
+
+    # Deleted media info is located in:
+    #   Table:  ZASSET
+    #   Column: Z_PK          (Primary Key)
+    #   Column: ZTRASHEDSTATE (1 if deleted)
+    #   Column: ZTRASHEDDATE  (not NULL if deleted)
+    #   Column: ZDIRECTORY    (e.g. 'DCIM/103/APPLE')
+    #   Column: ZFILENAME     (e.g. 'IMG_6600.JPG)
 
     # read the list of deleted media files
     my $sql = <<~'SQL_END';
