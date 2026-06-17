@@ -662,7 +662,7 @@ sub extractMediaFiles
             }
 
             # create the output directory (if needed)
-            mkdir ($out_sub_dir) unless (-d $out_sub_dir or $cmd_options{dry});
+            ensureDir ($out_sub_dir) unless ($cmd_options{dry});
 
             # find a suitable filename (or `undef` if duplicate)
             my $unique_filename = findUniqueFilename ($blob_file,
@@ -693,8 +693,7 @@ sub extractMediaFiles
                 {
                     # copy file to output directory
                     my $out_file = "$out_sub_dir/$unique_filename";
-                    File::Copy::copy ($blob_file, $out_file)
-                                               or die "Error: File copy failed: $!\n";
+                    copyFile ($blob_file, $out_file) or die "Error: File copy failed: $!\n";
 
                     setFileAttributes ($out_file, $lastmodif_time_piece, $birth_time_piece);
                 }
@@ -1150,7 +1149,7 @@ sub findUniqueFilename ($blob_file, $filename, $out_sub_dir, $lastmodif_time_pie
     }
 
     # file doesn't exist, return the same filename
-    return $filename if (not -e "$out_sub_dir/$filename");
+    return $filename if (not fileExists ("$out_sub_dir/$filename"));
 
     # compute the checksum of the file in the blob storage
     my $blob_checksum = computeFileChecksum ($blob_file);
@@ -1161,7 +1160,7 @@ sub findUniqueFilename ($blob_file, $filename, $out_sub_dir, $lastmodif_time_pie
                         or die qq{Error: Unexpected filename: $new_filename_proposal\n};
     my $index = 0;
 
-    while (-e "$out_sub_dir/$new_filename_proposal")
+    while (fileExists ("$out_sub_dir/$new_filename_proposal"))
     {
         # compute the checksum of the existing file (if any)
         my $existing_file_checkum
@@ -1183,8 +1182,53 @@ sub findUniqueFilename ($blob_file, $filename, $out_sub_dir, $lastmodif_time_pie
 sub computeFileChecksum ($filepath)
 {
     my $sha = Digest::SHA->new ('256');
-    $sha->addfile ($filepath, 'b');
-    return $sha->hexdigest;
+
+    if ($^O =~ /mswin32/i)
+    {
+        require Win32API::File;
+
+        # explicitly encode to UTF-16LE and add the C-style double-null terminator (\0\0)
+        my $utf16_path = Encode::encode ('UTF-16LE', $filepath . "\0");
+
+        # open the file natively bypassing the C-library's ANSI limitations
+        my $os_fh = Win32API::File::CreateFileW ($utf16_path,
+                                                 Win32API::File::FILE_GENERIC_READ(),
+                                                 Win32API::File::FILE_SHARE_READ(),
+                                                 [],
+                                                 Win32API::File::OPEN_EXISTING(),
+                                                 0,
+                                                 []);
+
+        if (!$os_fh || $os_fh == Win32API::File::INVALID_HANDLE_VALUE())
+        {
+            die qq{Error: Windows failed to natively open "$filepath": $^E\n};
+        }
+
+        # map the OS-level handle to a Perl filehandle
+        local *PERL_FH;
+        if (!Win32API::File::OsFHandleOpen (\*PERL_FH, $os_fh, 'r'))
+        {
+            Win32API::File::CloseHandle ($os_fh); # prevent handle leaks
+            die "Error: Could not map Windows OS handle to Perl handle: $!\n";
+        }
+
+        # ensure Perl reads the raw binary data for the hash
+        binmode (\*PERL_FH);
+
+        # Digest::SHA streams the file from the handle
+        $sha->addfile (\*PERL_FH);
+
+        # closing the Perl handle safely closes the underlying OS handle too
+        close (\*PERL_FH);
+
+        return $sha->hexdigest;
+    }
+    else
+    {
+        # native Unix/Linux/macOS behavior is naturally UTF-8 safe
+        $sha->addfile ($filepath, 'b');
+        return $sha->hexdigest;
+    }
 }
 
 # ----------------------------------------------------------------
@@ -1739,6 +1783,101 @@ sub parseBinaryPList ($filename_or_data)
             && Scalar::Util::blessed ($bplist_parser) eq 'Mac::PropertyList::ReadBinary');
 
     return $plist;
+}
+
+# ----------------------------------------------------------------
+
+sub ensureDir ($dir_name)
+{
+    if ($^O =~ /mswin32/i)
+    {
+        require Win32;
+
+        # try to create the directory natively via the Unicode API
+        my $success = Win32::CreateDirectory ($dir_name);
+        return 1 if $success; # success! It didn't exist, and now it does.
+
+        # if it failed, check the specific Windows Error Code using $^E
+        # Error 183 is ERROR_ALREADY_EXISTS.
+        if (($^E + 0) == 183)
+        {
+            # it exists, but is it a file or a folder? 
+            # Appending "\." forces Windows to evaluate the path as a directory entry.
+            my $test_path = $dir_name =~ /[\\\/]$/ ? "${dir_name}." : "${dir_name}\\.";
+
+            # GetLongPathName hits the disk to resolve the true name.
+            # If it's a file, the "\." makes it invalid and it returns undef.
+            if (defined Win32::GetLongPathName ($test_path))
+            {
+                return 1; # It safely exists as a directory!
+            }
+            else
+            {
+                die qq{Error: Cannot create directory. A file already exists at: "$dir_name"\n};
+            }
+        }
+
+        # if it failed for any other reason (e.g. Access Denied)
+        die qq{Error: Windows failed to create directory "$dir_name": $^E\n};
+    }
+    else
+    {
+        # native Mac/Linux natively understand UTF-8, so standard tools works
+        return 1 if -d $dir_name;
+
+        die qq{Error: Cannot create directory. A file already exists at: "$dir_name"\n}
+            if (-e $dir_name);
+
+        mkdir ($dir_name) or die qq{Error: Failed to create directory "$dir_name": $!\n};
+        return 1;
+    }
+}
+
+# ----------------------------------------------------------------
+
+sub copyFile ($from, $to)
+{
+    if ($^O =~ /mswin32/i)
+    {
+        require Win32API::File;
+
+        # explicit UTF-16 conversion:
+        # Append null-bytes (\0) and encode to raw UTF-16LE bytes (\0\0).
+        my $utf16_from = Encode::encode ('UTF-16LE', $from . "\0");
+        my $utf16_to   = Encode::encode ('UTF-16LE', $to   . "\0");
+
+        # call the native Windows Wide API
+        # CopyFileW (FROM, TO, bFailIfExists)
+        # We pass 0 for `bFailIfExists` to OVERWRITE, matching standard File::Copy behavior.
+        my $success = Win32API::File::CopyFileW ($utf16_from, $utf16_to, 0);
+
+        $success or die qq{Error: Windows failed to natively copy "$from" to "$to": $^E\n};
+        return 1;
+    }
+    else
+    {
+        # native Mac/Linux standard copy is already Unicode-aware
+        my $success = File::Copy::copy ($from, $to);
+        $success or die qq{Error: Failed to copy "$from" to "$to": $!\n};
+        return 1;
+    }
+}
+
+# ----------------------------------------------------------------
+
+sub fileExists ($path)
+{
+    if ($^O =~ /mswin32/i)
+    {
+        require Win32;
+        # `GetLongPathName` is Unicode-aware and returns undef if the path is not found
+        return defined Win32::GetLongPathName ($path) ? 1 : 0;
+    }
+    else
+    {
+        # standard Unix/Linux/macOS
+        return -e $path ? 1 : 0;
+    }
 }
 
 # ----------------------------------------------------------------
