@@ -1632,7 +1632,7 @@ sub createAlbumFileMap ($dbh, $photos_db_filename)
         FROM ZGENERICALBUM alb
         JOIN $junction_table junc ON alb.Z_PK        = junc.$album_col
         JOIN ZASSET ast           ON junc.$asset_col = ast.Z_PK
-        WHERE alb.ZTITLE IS NOT NULL 
+        WHERE alb.ZTITLE IS NOT NULL
           AND alb.ZKIND = 2         /* ZKIND 2 = User-created albums
                                        (ignores folders/system smart albums) for now */
           AND ast.ZTRASHEDSTATE = 0 /* ZTRASHEDSTATE 0 = Not deleted */
@@ -1801,7 +1801,7 @@ sub ensureDir ($dir_name)
         # Error 183 is ERROR_ALREADY_EXISTS.
         if (($^E + 0) == 183)
         {
-            # it exists, but is it a file or a folder? 
+            # it exists, but is it a file or a folder?
             # Appending "\." forces Windows to evaluate the path as a directory entry.
             my $test_path = $dir_name =~ /[\\\/]$/ ? "${dir_name}." : "${dir_name}\\.";
 
