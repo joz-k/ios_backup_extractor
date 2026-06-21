@@ -698,6 +698,9 @@ sub processMediaFile ($file_id,
                         ? '_DELETED'
                         : q{};
 
+    # sanitize orig_filename to prevent issues on Windows filesystems
+    $orig_filename = sanitizeNameForFilesystem ($orig_filename);
+
     my $filename = $orig_filename . $deleted_suffix . q{.} . lc $extension;
 
     # find the "LastModified" date for this file
@@ -726,7 +729,7 @@ sub processMediaFile ($file_id,
     if (!$cmd_options{'ignore-album-folders'} && exists $g_album_files{$relative_path})
     {
         # using album name as subdirectory
-        my $album_name = sanitizeAlbumNameForFolder ($g_album_files{$relative_path});
+        my $album_name = sanitizeNameForFilesystem ($g_album_files{$relative_path});
         $out_sub_dir .= "/$album_name";
         $display_sub_dir = $album_name;
     }
@@ -1856,75 +1859,75 @@ sub createAlbumFileMap ($dbh, $photos_db_filename)
 
 # ----------------------------------------------------------------
 
-sub sanitizeAlbumNameForFolder ($album_name)
+sub sanitizeNameForFilesystem ($name)
 {
-    # sanitize album name for use as directory name
+    # sanitize name for use as directory or file name
 
     # handle `undef` gracefully to prevent uninitialized warnings
-    $album_name //= '';
+    $name //= '';
 
     # 1. normalize Unicode to Precomposed Form (NFC)
-    $album_name = Unicode::Normalize::NFC ($album_name);
+    $name = Unicode::Normalize::NFC ($name);
 
     # 2. strip ASCII control characters (0x00-0x1F, 0x7F)
-    $album_name =~ s/[\x00-\x1F\x7F]/_/g;
+    $name =~ s/[\x00-\x1F\x7F]/_/g;
 
     # 3. peplace illegal filesystem characters
-    $album_name =~ s/[<>:"\/\\|?*]/_/g;
+    $name =~ s/[<>:"\/\\|?*]/_/g;
 
     # 4. trim leading whitespace
-    $album_name =~ s/^\s+//;
+    $name =~ s/^\s+//;
 
     # 5. trim trailing whitespace and dots
-    $album_name =~ s/[\s.]+$//;
+    $name =~ s/[\s.]+$//;
 
     # 6. prevent unix command-line flag injection
-    $album_name =~ s/^-/_/;
+    $name =~ s/^-/_/;
 
     # 7. fallback for empty or meaningless strings
     # If the substitutions left us with nothing, OR a string composed entirely
     # of underscores (e.g., input was "????" or "<>"), provide a safe fallback.
-    if ($album_name eq '' || $album_name =~ /^_+$/)
+    if ($name eq '' || $name =~ /^_+$/)
     {
-        $album_name = 'Unknown_Album';
+        $name = 'Unknown_Name';
     }
 
     # 8. safe filesystem byte truncation (Max 240 Bytes for Ext4/APFS)
     # Fast-path: Coarse trim at the character (UTF-8) level.
     # Since 1 char >= 1 byte, the string can never legitimately exceed 240 chars.
-    if (length ($album_name) > 240)
+    if (length ($name) > 240)
     {
-        $album_name = substr ($album_name, 0, 240);
+        $name = substr ($name, 0, 240);
     }
     # fine-tune: trim at the raw byte level to handle multi-byte chars (Emoji/Kanji).
     # chop() drops whole logical characters so we never split a byte sequence in half.
-    while (length (Encode::encode ('UTF-8', $album_name)) > 240)
+    while (length (Encode::encode ('UTF-8', $name)) > 240)
     {
-        chop $album_name;
+        chop $name;
     }
 
     # truncation might have exposed new trailing spaces/dots, re-clean:
-    $album_name =~ s/[\s.]+$//;
+    $name =~ s/[\s.]+$//;
 
     # second pass fallback in case truncation destroyed the whole valid string
-    if ($album_name eq '' || $album_name =~ /^_+$/)
+    if ($name eq '' || $name =~ /^_+$/)
     {
-        $album_name = 'Unknown_Album';
+        $name = 'Unknown_Name';
     }
 
     # 9. handle windows reserved device names
-    if ($album_name =~ /^(?i:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\..*)?$/)
+    if ($name =~ /^(?i:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\..*)?$/)
     {
-        $album_name = "_$album_name";
+        $name = "_$name";
     }
 
     # 10. handle unix reserved directory navigation links
-    if ($album_name eq '.' || $album_name eq '..')
+    if ($name eq '.' || $name eq '..')
     {
-        $album_name = "_$album_name";
+        $name = "_$name";
     }
 
-    return $album_name;
+    return $name;
 }
 
 # ----------------------------------------------------------------

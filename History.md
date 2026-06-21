@@ -19,6 +19,13 @@ HISTORY of the iOS Backup Extractor
     extract all files using only the default date-based structure, use the 
     new `--ignore-album-folders` option.
 
+* Fixed an issue with invalid Windows filenames.
+
+    Media files with characters that are illegal on Windows filesystems
+    (such as a colon in the filename) are now automatically sanitized.
+    This prevents extraction errors or zero-length files when running on
+    or extracting to a Windows system.
+
 1.2.5   (2025-02-28)
 --------------------
 
