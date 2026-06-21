@@ -46,6 +46,7 @@ my $g_out_dir            = undef;
 my @g_since_date         = (); # (YYYY, MM, DD)
 my %g_deleted_files      = ();
 my %g_album_files        = ();
+my @g_msg_attachments    = ();
 my %g_manifest_plist_map = ();
 my %g_status_plist_map   = ();
 
@@ -73,6 +74,7 @@ Getopt::Long::GetOptions(
     'list-long',    # more detailed device backup listing than --list
     'prepend-date', # prepend date to each filename
     'prepend-date-separator=s', # '-' (default), '_', None
+    'add-message-media|m',      # extract also files from message attachments
     'ignore-album-folders',     # do not create user album folders
     'ignore-icloud-media',      # skip files from iCloud
     'debug',        # enable internal debug messages (warning: a huge stderr output)
@@ -115,6 +117,8 @@ sub printHelp
                                 - ‘last-week’
                                 - ‘last-month’
               --add-trash     Extract also items marked as deleted.
+          -m, --add-message-media
+                              Extract also media attached to messages.
               --prepend-date  Prepend a media creation date to each exported filename.
                                 Default format is YYYY-MM-DD.
               --prepend-date-separator SEPARATOR
@@ -599,107 +603,61 @@ sub extractMediaFiles
                 say STDERR "  ╭────┤Extracting from: [${media_location}$media_subdir]";
             }
 
-            # find the file in the blob storage
-            my $subdir = $file_id =~ s/^(\w\w).+$/$1/r
-                or die qq{Error: Unexpected fileID: $file_id\n};
-            my $blob_file = "$g_backup_dir/$subdir/$file_id";
-            -f $blob_file or die qq{Error: "$blob_file" doesn't exists\n};
-
-            # parse the bplist from the SQLite database for this entry
-            my $bplist_obj = parseBPlist ($row->{file}, $file_id);
-
             # replace iCloud UUID filename with an original filename
             my $orig_filename = $is_icloud_media
                               ? replaceICloudFilename ($re_filename, $icloud_uid_filename_ref)
                               : $re_filename;
 
-            # add '_DELETED' flag to files marked as deleted
-            my $file_is_deleted = $g_deleted_files{$relative_path};
-            my $deleted_suffix  = ($cmd_options{'add-trash'} && $file_is_deleted)
-                                ? '_DELETED'
-                                : q{};
+            processMediaFile ($file_id,
+                              $relative_path,
+                              $row->{file},
+                              $orig_filename,
+                              $re_extension,
+                              \$file_index);
+        }
 
-            my $filename = $orig_filename . $deleted_suffix . q{.} . lc $re_extension;
+        # list relative paths of message attachments
+        listMessageAttachments ($tmp_fh) if $cmd_options{'add-message-media'};
 
-            # find the "LastModified" date for this file
-            my $lastmodif_time_piece
-                            = defined $bplist_obj
-                            ? getLastModifiedTimeFromBPListObj ($bplist_obj, $file_id)
-                            : undef;
+        # extract message attachments
+        if (@g_msg_attachments)
+        {
+            say STDERR "  ╭────┤Extracting from: [Message Attachments]";
 
-            # say STDERR "\tLastModified: ", $lastmodif_time_piece->strftime('%F %T');
+            my $msg_sql = <<~SQL_END;
+                SELECT fileID, relativePath, file FROM files
+                    WHERE domain='MediaDomain'
+                      AND relativePath = ?
+                SQL_END
 
-            # find the "Birth" date for this file
-            my $birth_time_piece = defined $bplist_obj
-                                 ? getBirthTimeFromBPListObj ($bplist_obj, $file_id)
-                                 : undef;
+            my $msg_sth = $dbh->prepare ($msg_sql)
+                or die qq{Error: 'prepare' method failed on ‘$tmp_manifest_db’ SQLite db:\n},
+                       qq{\t$DBI::errstr.\n};
 
-            # say STDERR "\tBirth ", $birth_time_piece->strftime('%F %T');
-
-            # skip if `--since` option is defined and this file is older than
-            # specified DATE
-            next if (   @g_since_date
-                     && defined $lastmodif_time_piece
-                     && olderThanSince ($lastmodif_time_piece, \@g_since_date));
-
-            # determine output directory and display filename based on album or date
-            my $out_sub_dir = $g_out_dir;
-            my $display_sub_dir = q{};  # for display purposes
-
-            if (!$cmd_options{'ignore-album-folders'} && exists $g_album_files{$relative_path})
+            for my $rel_path (@g_msg_attachments)
             {
-                # using album name as subdirectory
-                my $album_name = sanitizeAlbumNameForFolder ($g_album_files{$relative_path});
-                $out_sub_dir .= "/$album_name";
-                $display_sub_dir = $album_name;
-            }
-            else
-            {
-                # use date-based subdirectory if not in an album or if ignoring album folders
-                my $date_sub_dir = getDateSubDir ($lastmodif_time_piece);
-                $out_sub_dir .= "/$date_sub_dir" if $date_sub_dir ne q{};
-                $display_sub_dir = $date_sub_dir;
-            }
+                $msg_sth->execute($rel_path)
+                    or die qq{Error: 'execute' method failed on ‘$tmp_manifest_db’ SQLite db:\n},
+                           qq{\t$DBI::errstr.\n};
 
-            # create the output directory (if needed)
-            ensureDir ($out_sub_dir) unless ($cmd_options{dry});
-
-            # find a suitable filename (or `undef` if duplicate)
-            my $unique_filename = findUniqueFilename ($blob_file,
-                                                      $filename,
-                                                      $out_sub_dir,
-                                                      $lastmodif_time_piece);
-
-            if (not($cmd_options{'add-trash'}) && $file_is_deleted)
-            {
-                printf "%3d. ($subdir/$file_id) %-13s → <IN_TRASH>, Skipping...\n",
-                       $file_index, $filename;
-            }
-            elsif (not defined $unique_filename)
-            {
-                printf "%3d. ($subdir/$file_id) %-13s → <DUPLICATE>, Skipping...\n",
-                       $file_index, $filename;
-            }
-            else
-            {
-                my $display_filename = $display_sub_dir ne q{}
-                                     ? "$display_sub_dir/$unique_filename"
-                                     : $unique_filename;
-
-                printf "%3d. ($subdir/$file_id) %-13s → $display_filename\n",
-                       $file_index, $filename;
-
-                unless ($cmd_options{dry})
+                if (my $row = $msg_sth->fetchrow_hashref)
                 {
-                    # copy file to output directory
-                    my $out_file = "$out_sub_dir/$unique_filename";
-                    copyFile ($blob_file, $out_file) or die "Error: File copy failed: $!\n";
+                    my $file_id = $row->{fileID};
+                    my $relative_path = $row->{relativePath};
 
-                    setFileAttributes ($out_file, $lastmodif_time_piece, $birth_time_piece);
+                    my ($orig_filename, $re_extension) = ($relative_path =~ m{([^/]+)\.([^./]+)$});
+                    $orig_filename //= 'Unknown';
+                    $re_extension  //= 'bin';
+
+                    processMediaFile ($file_id,
+                                      $relative_path,
+                                      $row->{file},
+                                      $orig_filename,
+                                      $re_extension,
+                                      \$file_index,
+                                      1);
                 }
             }
-
-            $file_index += 1;
         }
 
         1; # return success for eval
@@ -713,6 +671,234 @@ sub extractMediaFiles
     }
 
     $dbh->disconnect;
+}
+
+# ----------------------------------------------------------------
+
+sub processMediaFile ($file_id,
+                      $relative_path,
+                      $bplist_blob,
+                      $orig_filename,
+                      $extension,
+                      $file_index_ref,
+                      $is_message = 0)
+{
+    # find the file in the blob storage
+    my $subdir = $file_id =~ s/^(\w\w).+$/$1/r
+        or die qq{Error: Unexpected fileID: $file_id\n};
+    my $blob_file = "$g_backup_dir/$subdir/$file_id";
+    -f $blob_file or die qq{Error: "$blob_file" doesn't exists\n};
+
+    # parse the bplist from the SQLite database for this entry
+    my $bplist_obj = parseBPlist ($bplist_blob, $file_id);
+
+    # add '_DELETED' flag to files marked as deleted
+    my $file_is_deleted = $g_deleted_files{$relative_path};
+    my $deleted_suffix  = ($cmd_options{'add-trash'} && $file_is_deleted)
+                        ? '_DELETED'
+                        : q{};
+
+    my $filename = $orig_filename . $deleted_suffix . q{.} . lc $extension;
+
+    # find the "LastModified" date for this file
+    my $lastmodif_time_piece
+                    = defined $bplist_obj
+                    ? getLastModifiedTimeFromBPListObj ($bplist_obj, $file_id)
+                    : undef;
+
+    # find the "Birth" date for this file
+    my $birth_time_piece = defined $bplist_obj
+                         ? getBirthTimeFromBPListObj ($bplist_obj, $file_id)
+                         : undef;
+
+    # say STDERR "\tBirth ", $birth_time_piece->strftime('%F %T');
+
+    # skip if `--since` option is defined and this file is older than
+    # specified DATE
+    return if (   @g_since_date
+               && defined $lastmodif_time_piece
+               && olderThanSince ($lastmodif_time_piece, \@g_since_date));
+
+    # determine output directory and display filename based on album or date
+    my $out_sub_dir = $g_out_dir;
+    my $display_sub_dir = q{};  # for display purposes
+
+    if (!$cmd_options{'ignore-album-folders'} && exists $g_album_files{$relative_path})
+    {
+        # using album name as subdirectory
+        my $album_name = sanitizeAlbumNameForFolder ($g_album_files{$relative_path});
+        $out_sub_dir .= "/$album_name";
+        $display_sub_dir = $album_name;
+    }
+    else
+    {
+        # use date-based subdirectory if not in an album or if ignoring album folders
+        my $date_sub_dir = getDateSubDir ($lastmodif_time_piece);
+        $out_sub_dir .= "/$date_sub_dir" if $date_sub_dir ne q{};
+        $display_sub_dir = $date_sub_dir;
+    }
+
+    # create the output directory (if needed)
+    unless ($cmd_options{dry})
+    {
+        ensureDir ($out_sub_dir);
+
+        if ($is_message)
+        {
+            $out_sub_dir .= '/Messages';
+            ensureDir ($out_sub_dir);
+        }
+    }
+    elsif ($is_message)
+    {
+        $out_sub_dir .= '/Messages';
+    }
+
+    if ($is_message)
+    {
+        $display_sub_dir .= '/Messages' if $display_sub_dir ne q{};
+        $display_sub_dir = 'Messages' if $display_sub_dir eq q{};
+    }
+
+    # find a suitable filename (or `undef` if duplicate)
+    my $unique_filename = findUniqueFilename ($blob_file,
+                                              $filename,
+                                              $out_sub_dir,
+                                              $lastmodif_time_piece);
+
+    if (not($cmd_options{'add-trash'}) && $file_is_deleted)
+    {
+        printf "%3d. ($subdir/$file_id) %-13s → <IN_TRASH>, Skipping...\n",
+               $$file_index_ref, $filename;
+    }
+    elsif (not defined $unique_filename)
+    {
+        printf "%3d. ($subdir/$file_id) %-13s → <DUPLICATE>, Skipping...\n",
+               $$file_index_ref, $filename;
+    }
+    else
+    {
+        my $display_filename = $display_sub_dir ne q{}
+                             ? "$display_sub_dir/$unique_filename"
+                             : $unique_filename;
+
+        printf "%3d. ($subdir/$file_id) %-13s → $display_filename\n",
+               $$file_index_ref, $filename;
+
+        unless ($cmd_options{dry})
+        {
+            # copy file to output directory
+            my $out_file = "$out_sub_dir/$unique_filename";
+            copyFile ($blob_file, $out_file) or die "Error: File copy failed: $!\n";
+
+            setFileAttributes ($out_file, $lastmodif_time_piece, $birth_time_piece);
+        }
+    }
+
+    $$file_index_ref += 1;
+}
+
+# ----------------------------------------------------------------
+
+sub listMessageAttachments ($tmp_fh)
+{
+    # copy `3d/3d0d7e5fb2ce288813306e4d4636395e047a3d28` (Library/SMS/sms.db) to temporary folder
+    my $sms_db_chksum_filename = '3d/3d0d7e5fb2ce288813306e4d4636395e047a3d28';
+
+    my $sms_db_filename = qq[${\ ($tmp_fh->dirname) }/sms.db];
+
+    unless (File::Copy::copy ("$g_backup_dir/$sms_db_chksum_filename", $sms_db_filename))
+    {
+        warn qq{Warning: Cannot copy or find sms.db database\n},
+             qq{\tfileID: $sms_db_chksum_filename\n}
+                    if $cmd_options{verbose};
+
+        return;
+    }
+
+    # open `sms.db` from temporary folder
+    my $dbh = DBI->connect ("dbi:SQLite:dbname=$sms_db_filename",
+                            undef,
+                            undef,
+                            {
+                                sqlite_open_flags => SQLITE_OPEN_READONLY,
+                                PrintError => 0,
+                                sqlite_unicode => 1,
+                            });
+
+    unless ($dbh)
+    {
+        warn qq{Warning: Cannot open '$sms_db_filename' as SQLite db: $DBI::errstr.\n}
+            if $cmd_options{verbose};
+
+        return;
+    }
+
+    # check if the `attachment` table exists
+    sqliteTableExists ($dbh, 'attachment', $sms_db_filename)
+        or do {
+            warn qq{Warning: 'attachment' table does not exist in '$sms_db_filename':\n},
+                 qq{\t$DBI::errstr.\n}
+                        if $cmd_options{verbose};
+
+            $dbh->disconnect;
+            return;
+        };
+
+    # get the list of all message attachments (table "attachment", column "filename")
+    my $sql = <<~'SQL_END';
+        SELECT filename FROM attachment
+            WHERE filename IS NOT NULL
+              AND filename != ''
+              AND mime_type IS NOT NULL
+              AND mime_type != ''
+            ORDER BY ROWID ASC;
+        SQL_END
+
+    my $sth = $dbh->prepare ($sql)
+        or do {
+            warn qq{Warning: 'prepare' method failed on '$sms_db_filename' SQLite db:\n},
+                 qq{\t$DBI::errstr.\n}
+                        if $cmd_options{verbose};
+
+            $dbh->disconnect;
+            return;
+        };
+
+    $sth->execute()
+        or do {
+            warn qq{Warning: 'execute' method failed on '$sms_db_filename' SQLite db:\n},
+                 qq{\t$DBI::errstr.\n}
+                        if $cmd_options{verbose};
+
+            $dbh->disconnect;
+            return;
+        };
+
+    # store the relative filenames in `@g_msg_attachments` array
+    while (my $row = $sth->fetchrow_hashref)
+    {
+        my $filename = $row->{filename};
+
+        # strip the leading `~/` prefix
+        # (e.g. "~/Library/SMS/Attachments/..." => "Library/SMS/Attachments/...")
+        $filename =~ s{^~/}{};
+
+        push @g_msg_attachments, $filename;
+
+        say STDERR qq{Info: Message attachment: "$filename"}
+            if ($cmd_options{verbose});
+    }
+
+    # cleanup
+    $sth->finish();
+
+    $dbh->disconnect
+        or do {
+            warn qq{Warning: Cannot properly disconnect '$sms_db_filename' SQLite db:},
+                 qq{\t$DBI::errstr.\n}
+                        if $cmd_options{verbose};
+        };
 }
 
 # ----------------------------------------------------------------

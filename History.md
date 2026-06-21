@@ -4,6 +4,12 @@ HISTORY of the iOS Backup Extractor
 1.2.6   (unreleased)
 --------------------
 
+* Message media extraction.
+
+    Added `--add-message-media` (or `-m`) option to extract media files
+    attached to messages. When enabled, these attachments are extracted into a
+    dedicated `Messages` subdirectory within their date-based or album folders.
+
 * Album folders support.
 
     Media files that were added to user-created albums on the iOS device are now 
