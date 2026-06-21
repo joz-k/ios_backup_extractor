@@ -483,7 +483,7 @@ sub extractMediaFiles
     say STDERR 'Info: Temp directory: ', $tmp_fh->dirname
         if ($cmd_options{verbose});
 
-    # make the list of deleted files to skip (if requested)
+    # make the list of deleted files to skip (if requested) and map files to albums
     createAuxFileList ($tmp_fh);
 
     # copy `Manifest.db` to the temporary directory
