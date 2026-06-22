@@ -12,11 +12,11 @@ HISTORY of the iOS Backup Extractor
 
 * Album folders support.
 
-    Media files that were added to user-created albums on the iOS device are now 
-    extracted to folders named after the album name. Files that weren't added 
-    to any album continue to be organized according to the default date-based 
-    structure (see `--format` option). To disable this behavior and 
-    extract all files using only the default date-based structure, use the 
+    Media files that were added to user-created albums on the iOS device are now
+    extracted to folders named after the album name. Files that weren't added
+    to any album continue to be organized according to the default date-based
+    structure (see `--format` option). To disable this behavior and
+    extract all files using only the default date-based structure, use the
     new `--ignore-album-folders` option.
 
 * Fixed an issue with invalid Windows filenames.
@@ -44,7 +44,7 @@ HISTORY of the iOS Backup Extractor
     Media files downloaded to the device from iCloud are also exported during
     the extraction process. To skip these files, the new `--ignore-icloud-media`
     option can be used.
-  
+
 1.2.4   (2024-11-13)
 --------------------
 
