@@ -4,6 +4,12 @@ HISTORY of the iOS Backup Extractor
 1.2.6   (unreleased)
 --------------------
 
+* Improved output table format for backup listing.
+
+    The output table displayed when using the `--list` option now automatically
+    extends its width (up to 120 characters) to better utilize the terminal
+    width, preventing unnecessary text truncation.
+
 * Message media extraction.
 
     Added `--add-message-media` (or `-m`) option to extract media files

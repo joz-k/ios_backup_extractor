@@ -13,6 +13,7 @@ use utf8;
 use Data::Dumper   ();
 use Getopt::Long   ();
 use Scalar::Util   ();
+use List::Util     ();
 use Time::Piece    ();
 use File::Temp     ();
 use File::Copy     ();
@@ -300,44 +301,102 @@ sub listBackups
     }
     else # `--list`
     {
-        displayBackupList (\%device_backup_map);
+        displayBackupList (\%device_backup_map, getTerminalWidth());
     }
 }
 
 # ----------------------------------------------------------------
 
-sub displayBackupList ($all_devices_backup_hashref)
+sub displayBackupList ($all_devices_backup_hashref, $term_width)
 {
-    my ($serial, $name, $device, $backup_date, $encrypted);
-    $= = 100; # increase the number of lines per page from 60 to 100
+    use constant MIN_WIDTH => 68;
+    use constant MAX_WIDTH => 120;
 
-format STDOUT_TOP =
+    # define table columns: title, alignment, flex weight, base width, and data extractor
+    my @cols = (
+        { title => ' Serial Number', align => 'left',   flex =>  0, base_w => 15,
+          get   => sub ($k, $v) { " $k" } },
+        { title => ' Name',          align => 'left',   flex => 15, base_w => 15,
+          get   => sub ($k, $v) { " " . ($v->{Info}{'Display Name'} // '') } },
+        { title => ' Device',        align => 'left',   flex => 14, base_w => 14,
+          get   => sub ($k, $v) { " " . ($v->{Info}{'Product Name'} // '') } },
+        { title => ' Backup Date',   align => 'left',   flex =>  0, base_w => 18,
+          get   => sub ($k, $v) { " " . utcTimeToLocaltime($v->{Info}{'Last Backup Date'}) } },
+        { title => 'Encrypted',      align => 'center', flex =>  0, base_w => 11,
+          get   => sub ($k, $v) { $v->{Manifest}{IsEncrypted} ? 'Yes' : 'No' } },
+    );
 
-@||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
-'Available iOS Device Backups'
---------------- --------------- -------------- ------------------ -----------
- Serial Number   Name            Device         Backup Date        Encrypted
---------------- --------------- -------------- ------------------ -----------
-.
-format STDOUT =
- @<<<<<<<<<<<<<  @<<<<<<<<<<...  @<<<<<<<<<...  @<<<<<<<<<<<<<<<<  @|||||||||
- $serial,        $name,          $device,       $backup_date,      $encrypted
-.
+    # extract and format text for all rows
+    my @rows = map {
+        # `$k` is the serial number (hash key),
+        # `$v` is the device info hash (value)
+        my ($k, $v) = ($_, $all_devices_backup_hashref->{$_});
+        [ map { $_->{get}->($k, $v) } @cols ]
+    } sort keys %$all_devices_backup_hashref;
 
-    for $serial (sort keys %$all_devices_backup_hashref)
+    # calculate total target width of the table, clamped between MIN_WIDTH and MAX_WIDTH.
+    # ($term_width - 1 is used to prevent accidental line wrapping on the terminal edge)
+    my $target_w = List::Util::max (MIN_WIDTH, List::Util::min (MAX_WIDTH, $term_width - 1));
+
+    # `$fixed_w` is the sum of base widths of FIXED (non-flexible) columns only,
+    # plus the single-space separators between all columns (@cols - 1)
+    my $fixed_w  = List::Util::sum0 (map { $_->{flex} ? 0 : $_->{base_w} } @cols) + (@cols - 1);
+
+    # `$flex_rem` is the remaining width to be distributed among flexible columns
+    my $flex_rem = $target_w - $fixed_w;
+
+    # `$flex_wgt` is the sum of flex weights of all remaining flexible columns
+    my $flex_wgt = List::Util::sum0 (map { $_->{flex} } @cols);
+
+    # assign final widths to each column
+    for my $i (0 .. $#cols)
     {
-        my $device_backup_info_hashref = $all_devices_backup_hashref->{$serial};
-        $name   = $device_backup_info_hashref->{Info}{'Display Name'};
-        $device = $device_backup_info_hashref->{Info}{'Product Name'},
-        $backup_date = utcTimeToLocaltime (
-                                $device_backup_info_hashref->{Info}{'Last Backup Date'});
-        $encrypted = $device_backup_info_hashref->{Manifest}{IsEncrypted}
-                   ? 'Yes'
-                   : 'No';
+        my $c = $cols[$i]; # `$c` is a column definition
+        if ($c->{flex})
+        {
+            # `$alloc` is the width allocated for the current column based on its flex weight
+            my $alloc = int ($flex_rem * $c->{flex} / $flex_wgt);
 
-        write;
+            # `$max_content` is the maximum required width for the current column,
+            # ensuring it at least fits its base width (which covers the header)
+            my $max_content = List::Util::max ($c->{base_w},
+                                               # list all text lengths for `$i`-th column
+                                               map { length ($_->[$i]) } @rows);
+
+            # do not expand beyond the longest data entry
+            $c->{w} = List::Util::min ($alloc, $max_content);
+
+            # deduct the actually used width so remaining flex columns can use any surplus
+            $flex_rem -= $c->{w};
+            $flex_wgt -= $c->{flex};
+        }
+        else
+        {
+            $c->{w} = $c->{base_w};
+        }
     }
 
+    # helper to format and truncate individual cells
+    my $fmt = sub ($s, $c) {
+        $s = substr ($s, 0, $c->{w} - 3) . '...' if length ($s) > $c->{w};
+        my $pad = $c->{w} - length ($s);
+        return $c->{align} eq 'center'
+            ? (" " x int ($pad / 2)) . $s . (" " x ($pad - int ($pad / 2)))
+            : sprintf ("%-*s", $c->{w}, $s);
+    };
+
+    # render the table
+    my $dashes = join (' ', map { '-' x $_->{w} } @cols);
+
+    say "\n" . $fmt->('Available iOS Device Backups',
+                      { w => length ($dashes), align => 'center' });
+    say $dashes;
+    say join (' ', map { $fmt->($_->{title}, $_) } @cols);
+    say $dashes;
+    for my $r (@rows)
+    {
+        say join (' ', map { $fmt->($r->[$_], $cols[$_]) } 0 .. $#cols);
+    }
     print "\n";
 }
 
