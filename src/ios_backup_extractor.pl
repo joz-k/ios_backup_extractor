@@ -226,11 +226,21 @@ sub enumerateBackups
 
     my %device_backup_map;
 
-    my $wait_msg = "Reading list of iOS backups...";
-    my $wait_msg_len = length ($wait_msg) + 1;
-    my $clear_msg = "\b" x $wait_msg_len . q{ } x $wait_msg_len . "\b" x $wait_msg_len;
+    my $clear_msg = q{};
 
-    print STDERR $wait_msg unless $cmd_options{verbose};
+    unless ($cmd_options{verbose} || !isTerminal())
+    {
+        # enable auto-flush for STDERR buffer
+        my $old_fh = select (STDERR);
+        $| = 1;
+        select ($old_fh);
+
+        my $wait_msg = "Reading list of iOS backups...";
+        print STDERR $wait_msg;
+
+        my $wait_msg_len = length ($wait_msg) + 1;
+        $clear_msg = "\b" x $wait_msg_len . q{ } x $wait_msg_len . "\b" x $wait_msg_len;
+    }
 
     for my $backup_dir (@device_backup_dirs)
     {
@@ -284,7 +294,15 @@ sub enumerateBackups
     scalar keys %device_backup_map > 0
         or die $clear_msg, "There are no usable iOS device backups found on this computer.\n";
 
-    print STDERR $clear_msg; # clear "Reading..." message
+    if ($clear_msg)
+    {
+        print STDERR $clear_msg; # clear "Reading..." message
+
+        # disable auto-flush for STDERR buffer
+        my $old_fh = select (STDERR);
+        $| = 1;
+        select ($old_fh);
+    }
 
     return %device_backup_map;
 }
@@ -2142,8 +2160,37 @@ sub getAppExtension
 
 # ----------------------------------------------------------------
 
+sub isTerminal
+{
+    # cache the result so subsequent calls are instantaneous
+    state $is_tty;
+    return $is_tty if defined $is_tty;
+
+    $is_tty = (-t STDOUT) ? 1 : 0;
+
+    # MinTTY / Git Bash / MSYS2 Workaround for Strawberry/ActiveState Perl:
+    # Such Perl sees MinTTY ptys as named pipes, so `-t STDOUT` is false.
+    # We ask the MSYS2 shell (if available) to test if fd 1 (STDOUT) is a terminal.
+    if (!$is_tty && $^O =~ /mswin32/i)
+    {
+        local *STDERR;
+        open STDERR, '>', File::Spec->devnull();
+
+        # system() returns 0 if the shell script evaluates to true
+        $is_tty = 1 if (system('sh', '-c', '[ -t 1 ]') == 0);
+    }
+
+    return $is_tty;
+}
+
+# ----------------------------------------------------------------
+
 sub getTerminalWidth
 {
+    # check if STDOUT is redirected to a file or pipe
+    # If it is NOT a terminal, return a predefined width.
+    return 100 unless isTerminal();
+
     my $hasTputCmd = sub {
         my $out = `tput cols 2>&1`;
         return $out && $out =~ /^\d+\s*$/s;

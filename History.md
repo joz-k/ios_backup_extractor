@@ -4,12 +4,6 @@ HISTORY of the iOS Backup Extractor
 1.2.6   (unreleased)
 --------------------
 
-* Improved output table format for backup listing.
-
-    The output table displayed when using the `--list` option now automatically
-    extends its width (up to 120 characters) to better utilize the terminal
-    width, preventing unnecessary text truncation.
-
 * Message media extraction.
 
     Added `--add-message-media` (or `-m`) option to extract media files
@@ -31,6 +25,17 @@ HISTORY of the iOS Backup Extractor
     (such as a colon in the filename) are now automatically sanitized.
     This prevents extraction errors or zero-length files when running on
     or extracting to a Windows system.
+
+* Improved output table format for backup listing.
+
+    The output table displayed when using the `--list` option now automatically
+    extends its width (up to 120 characters) to better utilize the terminal
+    width, preventing unnecessary text truncation.
+
+* Improved behavior in non-interactive environments.
+
+    Avoids printing backup scan progress messages and terminal size probing
+    when standard output is redirected to a file or a pipe.
 
 1.2.5   (2025-02-28)
 --------------------
