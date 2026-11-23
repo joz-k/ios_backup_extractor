@@ -37,3 +37,6 @@ inc/
 # MacOS clutter
 .DS_Store
 
+# Rust
+/target
+
