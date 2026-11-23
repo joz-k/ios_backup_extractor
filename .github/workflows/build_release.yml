@@ -1,0 +1,105 @@
+name: Build Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.arch }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            arch: x64-windows
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            arch: arm64-macos
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            arch: intel64-macos
+          # ubuntu-22.04 keeps the glibc requirement low enough for older distros
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            arch: x64-linux
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Determine version
+        id: version
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version')
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        run: cargo build --release --locked --target ${{ matrix.target }}
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $name = "iOS_Backup_Extractor-v${{ steps.version.outputs.version }}_${{ matrix.arch }}.zip"
+          Compress-Archive -Path "target/${{ matrix.target }}/release/ios_backup_extractor.exe" -DestinationPath $name
+
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          name="iOS_Backup_Extractor-v${{ steps.version.outputs.version }}_${{ matrix.arch }}.zip"
+          (cd "target/${{ matrix.target }}/release" && zip "$GITHUB_WORKSPACE/$name" ios_backup_extractor)
+
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          name="iOS_Backup_Extractor-v${{ steps.version.outputs.version }}_${{ matrix.arch }}.tar.gz"
+          tar -czf "$name" -C "target/${{ matrix.target }}/release" ios_backup_extractor
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.arch }}
+          path: iOS_Backup_Extractor-v*
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: dist-*
+          merge-multiple: true
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          draft: true
