@@ -2079,19 +2079,39 @@ fn terminal_width() -> usize {
 fn msys_terminal_width() -> Option<usize> {
     use std::process::{Command, Stdio};
 
-    // Query the controlling terminal through the MSYS shell: `stty size`
-    // reads the real pty window size ("rows cols"). /dev/tty is used so the
-    // query works regardless of how our own stdio handles are wired.
-    let out = Command::new("sh")
-        .arg("-c")
-        .arg("stty size < /dev/tty")
+    let parse_cols = |s: &str| -> Option<usize> {
+        s.split_whitespace()
+            .nth(1)
+            .and_then(|c| c.parse().ok())
+            .filter(|&w| w > 0)
+    };
+
+    // `stty size` reads the pty window size ("rows cols") from its stdin.
+    // Stdin MUST be inherited explicitly: Command::output() nulls it by
+    // default, which makes stty fail on a non-terminal.
+    if let Ok(out) = Command::new("stty")
+        .arg("size")
+        .stdin(Stdio::inherit())
         .stderr(Stdio::null())
         .output()
-        .ok()?;
-    if out.status.success() {
-        let s = String::from_utf8_lossy(&out.stdout);
-        if let Some(w) = s.split_whitespace().nth(1).and_then(|c| c.parse().ok()) {
-            if w > 0 {
+    {
+        if out.status.success() {
+            if let Some(w) = parse_cols(&String::from_utf8_lossy(&out.stdout)) {
+                return Some(w);
+            }
+        }
+    }
+
+    // variant querying the controlling terminal, in case stdin is redirected
+    if let Ok(out) = Command::new("sh")
+        .arg("-c")
+        .arg("stty size < /dev/tty")
+        .stdin(Stdio::inherit())
+        .stderr(Stdio::null())
+        .output()
+    {
+        if out.status.success() {
+            if let Some(w) = parse_cols(&String::from_utf8_lossy(&out.stdout)) {
                 return Some(w);
             }
         }
