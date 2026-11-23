@@ -2063,25 +2063,50 @@ fn terminal_width() -> usize {
     if !is_terminal() {
         return 100;
     }
-    if let Some((w, _)) = terminal_size::terminal_size() {
-        return w.0 as usize;
+    // Trust the native query only when stdout really is a console/tty.
+    // Under MinTTY, stdout is a pty pipe, yet Windows may still expose a stub
+    // console with a default 80-column buffer; querying it would mask the
+    // real pty width and short-circuit the MSYS fallback below.
+    if io::stdout().is_terminal() {
+        if let Some((w, _)) = terminal_size::terminal_size() {
+            return w.0 as usize;
+        }
     }
-    // MinTTY / Git Bash: stdout is a pty pipe with no console handle, so the
-    // native query above fails; ask tput, which reads the width via terminfo.
-    if let Ok(out) = std::process::Command::new("tput")
-        .arg("cols")
-        .stderr(std::process::Stdio::null())
+    msys_terminal_width().unwrap_or(80)
+}
+
+#[cfg(windows)]
+fn msys_terminal_width() -> Option<usize> {
+    use std::process::{Command, Stdio};
+
+    // Query the controlling terminal through the MSYS shell: `stty size`
+    // reads the real pty window size ("rows cols"). /dev/tty is used so the
+    // query works regardless of how our own stdio handles are wired.
+    let out = Command::new("sh")
+        .arg("-c")
+        .arg("stty size < /dev/tty")
+        .stderr(Stdio::null())
         .output()
-    {
-        if out.status.success() {
-            if let Ok(w) = String::from_utf8_lossy(&out.stdout).trim().parse::<usize>() {
-                if w > 0 {
-                    return w;
-                }
+        .ok()?;
+    if out.status.success() {
+        let s = String::from_utf8_lossy(&out.stdout);
+        if let Some(w) = s.split_whitespace().nth(1).and_then(|c| c.parse().ok()) {
+            if w > 0 {
+                return Some(w);
             }
         }
     }
-    80
+
+    // some shells export COLUMNS
+    std::env::var("COLUMNS")
+        .ok()
+        .and_then(|s| s.trim().parse().ok())
+        .filter(|&w| w > 0)
+}
+
+#[cfg(not(windows))]
+fn msys_terminal_width() -> Option<usize> {
+    None
 }
 
 fn app_name() -> String {
