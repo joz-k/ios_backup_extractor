@@ -2063,9 +2063,25 @@ fn terminal_width() -> usize {
     if !is_terminal() {
         return 100;
     }
-    terminal_size::terminal_size()
-        .map(|(w, _)| w.0 as usize)
-        .unwrap_or(80)
+    if let Some((w, _)) = terminal_size::terminal_size() {
+        return w.0 as usize;
+    }
+    // MinTTY / Git Bash: stdout is a pty pipe with no console handle, so the
+    // native query above fails; ask tput, which reads the width via terminfo.
+    if let Ok(out) = std::process::Command::new("tput")
+        .arg("cols")
+        .stderr(std::process::Stdio::null())
+        .output()
+    {
+        if out.status.success() {
+            if let Ok(w) = String::from_utf8_lossy(&out.stdout).trim().parse::<usize>() {
+                if w > 0 {
+                    return w;
+                }
+            }
+        }
+    }
+    80
 }
 
 fn app_name() -> String {
