@@ -57,30 +57,47 @@ jobs:
       - name: Build
         run: cargo build --release --locked --target ${{ matrix.target }}
 
+      - name: Install typst
+        uses: typst-community/setup-typst@v5
+
+      - name: Build Readme.pdf
+        run: typst compile doc/_Readme.typ Readme.pdf
+
       - name: Package (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $name = "iOS_Backup_Extractor-v${{ steps.version.outputs.version }}_${{ matrix.arch }}.zip"
-          Compress-Archive -Path "target/${{ matrix.target }}/release/ios_backup_extractor.exe" -DestinationPath $name
+          $name = "iOS_Backup_Extractor-v${{ steps.version.outputs.version }}_${{ matrix.arch }}"
+          New-Item -ItemType Directory -Path $name | Out-Null
+          Copy-Item "target/${{ matrix.target }}/release/ios_backup_extractor.exe" "$name/"
+          Copy-Item "Readme.pdf" "$name/"
+          Compress-Archive -Path $name -DestinationPath "$name.zip"
 
       - name: Package (macOS)
         if: runner.os == 'macOS'
         run: |
-          name="iOS_Backup_Extractor-v${{ steps.version.outputs.version }}_${{ matrix.arch }}.zip"
-          (cd "target/${{ matrix.target }}/release" && zip "$GITHUB_WORKSPACE/$name" ios_backup_extractor)
+          name="iOS_Backup_Extractor-v${{ steps.version.outputs.version }}_${{ matrix.arch }}"
+          mkdir "$name"
+          cp "target/${{ matrix.target }}/release/ios_backup_extractor" "$name/"
+          cp Readme.pdf "$name/"
+          zip -r "$name.zip" "$name"
 
       - name: Package (Linux)
         if: runner.os == 'Linux'
         run: |
-          name="iOS_Backup_Extractor-v${{ steps.version.outputs.version }}_${{ matrix.arch }}.tar.gz"
-          tar -czf "$name" -C "target/${{ matrix.target }}/release" ios_backup_extractor
+          name="iOS_Backup_Extractor-v${{ steps.version.outputs.version }}_${{ matrix.arch }}"
+          mkdir "$name"
+          cp "target/${{ matrix.target }}/release/ios_backup_extractor" "$name/"
+          cp Readme.pdf "$name/"
+          tar -czf "$name.tar.gz" "$name"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: dist-${{ matrix.arch }}
-          path: iOS_Backup_Extractor-v*
+          path: |
+            iOS_Backup_Extractor-v*.zip
+            iOS_Backup_Extractor-v*.tar.gz
           if-no-files-found: error
 
   release:
