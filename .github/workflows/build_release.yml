@@ -59,6 +59,10 @@ jobs:
 
       - name: Install typst
         uses: typst-community/setup-typst@v5
+        with:
+          # note-me 0.4.0 needs typst >= 0.12 (image.decode); pin the version
+          # used locally, which still ships binaries for all platforms
+          typst-version: '0.12.0'
 
       - name: Build Readme.pdf
         run: typst compile doc/_Readme.typ Readme.pdf
