@@ -1965,6 +1965,8 @@ fn set_file_attributes(
     {
         let _ = set_creation_time_windows(file, birth);
     }
+    #[cfg(not(any(target_os = "macos", windows)))]
+    let _ = birth;
 }
 
 #[cfg(target_os = "macos")]
